@@ -1,0 +1,572 @@
+---
+// ============================================
+// HELICASE — Blog Article Detail Page
+// /blog/[slug]
+// Reading time, TOC sidebar, prev/next nav,
+// reading progress bar, refined typography.
+// ============================================
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog', ({ data }) => !data.draft);
+  return posts.map(post => ({
+    params: { slug: post.id.replace(/\//g, '-') },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content, headings } = await render(post);
+const { title, date, category, tags, summary } = post.data;
+
+const catLabel = { tech: 'TECH', daily: 'DAILY', reviews: 'REVIEWS' }[category];
+
+// Reading time — count CJK chars + English words
+const rawText = (post.body ?? '').replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '').replace(/[#*_\[\]!>|-]/g, '');
+const cjkChars = (rawText.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
+const enWords = (rawText.replace(/[\u4e00-\u9fff\u3400-\u4dbf]/g, '').match(/[a-zA-Z]+/g) || []).length;
+const readingMins = Math.max(1, Math.ceil((cjkChars / 300) + (enWords / 200)));
+
+// Prev / Next navigation
+const allPosts = (await getCollection('blog', ({ data }) => !data.draft))
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+const curIdx = allPosts.findIndex(p => p.id === post.id);
+const prevPost = curIdx < allPosts.length - 1 ? allPosts[curIdx + 1] : null;
+const nextPost = curIdx > 0 ? allPosts[curIdx - 1] : null;
+
+// Only h2/h3 in TOC
+const tocHeadings = headings.filter(h => h.depth <= 3);
+---
+
+<BaseLayout title={title} description={summary} type="article">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: title,
+    description: summary,
+    datePublished: date.toISOString(),
+    articleSection: catLabel,
+    keywords: tags.join(', '),
+    author: { '@type': 'Person', name: 'HelicasE' },
+    mainEntityOfPage: new URL(Astro.url.pathname, Astro.site ?? 'https://helicase.pages.dev').href,
+  })} />
+  <!-- Reading progress bar -->
+  <div class="article-progress"><div class="article-progress-bar" id="progress-bar"></div></div>
+
+  <div class:list={['article-page', { 'has-toc': tocHeadings.length > 0 }]}>
+    <!-- Back to canvas -->
+    <a href="/" class="article-back">← canvas</a>
+
+    <!-- Category tag -->
+    <span class="article-cat">{catLabel}</span>
+
+    <!-- Title (shared view-transition-name with canvas cluster) -->
+    <h1
+      class="article-title"
+      style={`view-transition-name: post-${post.id.replace(/\//g, '-')}`}
+    >
+      {title}
+    </h1>
+
+    <!-- Meta -->
+    <div class="article-meta">
+      <time class="article-date">
+        {date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+      </time>
+      <span class="article-reading-time">{readingMins} min read</span>
+      {tags.length > 0 && (
+        <span class="article-tags">
+          {tags.map(t => `#${t}`).join(' ')}
+        </span>
+      )}
+    </div>
+
+    <!-- Summary / excerpt -->
+    {summary && <p class="article-summary">{summary}</p>}
+
+    <!-- Divider line -->
+    <hr class="article-divider" />
+
+    <!-- Article with TOC sidebar -->
+    <div class="article-layout">
+      <article class="article-body">
+        <Content />
+      </article>
+
+      {tocHeadings.length > 0 && (
+        <nav class="article-toc">
+          <span class="toc-label">INDEX</span>
+          <ul class="toc-list">
+            {tocHeadings.map(h => (
+              <li class={`toc-item toc-item--h${h.depth}`}>
+                <a href={`#${h.slug}`}>{h.text}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+    </div>
+
+    <!-- Prev / Next navigation -->
+    {(prevPost || nextPost) && (
+      <nav class="article-nav">
+        {prevPost && (
+          <a href={`/blog/${prevPost.id.replace(/\//g, '-')}`} class="article-nav-link article-nav-link--prev">
+            <span class="article-nav-dir">← prev</span>
+            <span class="article-nav-title">{prevPost.data.title}</span>
+          </a>
+        )}
+        {nextPost && (
+          <a href={`/blog/${nextPost.id.replace(/\//g, '-')}`} class="article-nav-link article-nav-link--next">
+            <span class="article-nav-dir">next →</span>
+            <span class="article-nav-title">{nextPost.data.title}</span>
+          </a>
+        )}
+      </nav>
+    )}
+  </div>
+
+  <script>
+    // Reading progress bar
+    const bar = document.getElementById('progress-bar');
+    if (bar) {
+      const onScroll = () => {
+        const el = document.querySelector<HTMLElement>('.article-body');
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const scrolled = Math.max(0, -rect.top);
+        const total = el.offsetHeight - window.innerHeight;
+        bar.style.width = total > 0 ? `${Math.min(100, (scrolled / total) * 100)}%` : '0%';
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    }
+
+    // TOC active heading highlight
+    const tocLinks = document.querySelectorAll('.toc-item a');
+    if (tocLinks.length > 0) {
+      const headingEls = Array.from(tocLinks).map(a => {
+        const id = decodeURIComponent(a.getAttribute('href')!.slice(1));
+        return document.getElementById(id);
+      }).filter(Boolean) as HTMLElement[];
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const link = document.querySelector(`.toc-item a[href="#${encodeURIComponent(entry.target.id)}"]`);
+            if (!link) continue;
+            if (entry.isIntersecting) {
+              document.querySelectorAll('.toc-item a.active').forEach(el => el.classList.remove('active'));
+              link.classList.add('active');
+            }
+          }
+        },
+        { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
+      );
+      headingEls.forEach(el => observer.observe(el));
+    }
+  </script>
+</BaseLayout>
+
+<style>
+  /* ── Progress Bar ─────────────────────── */
+  .article-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    z-index: 100;
+    background: transparent;
+  }
+  .article-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--color-blue);
+    transition: width 80ms linear;
+  }
+
+  /* ── Page Container ───────────────────── */
+  .article-page {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 80px 24px 120px;
+    font-family: var(--font-body);
+  }
+
+  .article-page.has-toc {
+    max-width: 960px;
+  }
+
+  /* ── Back Link ────────────────────────── */
+  .article-back {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-silver);
+    text-transform: lowercase;
+    letter-spacing: 0.08em;
+    transition: color var(--duration-micro) var(--ease-mechanical);
+    display: inline-block;
+    margin-bottom: 32px;
+  }
+  .article-back:hover { color: var(--color-blue); }
+
+  /* ── Category ─────────────────────────── */
+  .article-cat {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--color-blue);
+    letter-spacing: 0.15em;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  /* ── Title ────────────────────────────── */
+  .article-title {
+    font: var(--text-h1);
+    color: var(--color-deep-blue);
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  /* ── Meta ─────────────────────────────── */
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-silver);
+  }
+
+  .article-reading-time {
+    color: var(--color-silver);
+  }
+  .article-reading-time::before {
+    content: '·';
+    margin-right: 16px;
+    color: var(--color-silver-light);
+  }
+
+  .article-tags {
+    color: var(--color-silver-light);
+    letter-spacing: 0.03em;
+  }
+
+  /* ── Summary ──────────────────────────── */
+  .article-summary {
+    font-size: 1.05rem;
+    line-height: 1.65;
+    color: var(--color-text-secondary);
+    margin-top: 20px;
+    margin-bottom: 0;
+    padding-left: 16px;
+    border-left: 2px solid var(--color-silver-light);
+  }
+
+  /* ── Divider ──────────────────────────── */
+  .article-divider {
+    border: none;
+    border-top: var(--line-width) solid var(--color-silver-light);
+    margin: 32px 0;
+  }
+
+  /* ── Layout: Article + TOC ────────────── */
+  .article-layout {
+    display: flex;
+    gap: 48px;
+    align-items: flex-start;
+  }
+
+  .article-body {
+    flex: 1;
+    min-width: 0;
+    font: var(--text-body);
+    color: var(--color-black);
+    line-height: 1.85;
+  }
+
+  /* ── TOC Sidebar ──────────────────────── */
+  .article-toc {
+    width: 180px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 80px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    display: none;
+  }
+
+  .has-toc .article-toc {
+    display: block;
+  }
+
+  .toc-label {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--color-silver);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 1px solid var(--color-silver-light);
+  }
+
+  .toc-item {
+    margin: 0;
+  }
+
+  .toc-item a {
+    display: block;
+    padding: 4px 0 4px 14px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--color-silver);
+    text-decoration: none;
+    line-height: 1.45;
+    transition: color var(--duration-micro), border-color var(--duration-micro);
+    border-left: 1px solid transparent;
+    margin-left: -1px;
+  }
+
+  .toc-item a:hover,
+  .toc-item a.active {
+    color: var(--color-blue);
+    border-left-color: var(--color-blue);
+  }
+
+  .toc-item--h3 a {
+    padding-left: 26px;
+    font-size: 0.64rem;
+  }
+
+  /* ── Typography: Headings ─────────────── */
+  .article-body :global(h1) {
+    font: var(--text-h1);
+    color: var(--color-deep-blue);
+    margin-top: 56px;
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
+  }
+
+  .article-body :global(h2) {
+    font: var(--text-h2);
+    color: var(--color-deep-blue);
+    margin-top: 56px;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-silver-light);
+    letter-spacing: -0.01em;
+  }
+
+  .article-body :global(h3) {
+    font: var(--text-h3);
+    color: var(--color-deep-blue);
+    margin-top: 36px;
+    margin-bottom: 10px;
+  }
+
+  .article-body :global(h4) {
+    font: 600 1.05rem/1.4 var(--font-body);
+    color: var(--color-deep-blue);
+    margin-top: 28px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Typography: Paragraphs ───────────── */
+  .article-body :global(p) {
+    margin-bottom: 18px;
+  }
+
+  /* ── Typography: Links ────────────────── */
+  .article-body :global(a) {
+    color: var(--color-blue);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: opacity var(--duration-micro);
+  }
+  .article-body :global(a:hover) {
+    opacity: 0.7;
+  }
+
+  /* ── Typography: Lists ────────────────── */
+  .article-body :global(ul),
+  .article-body :global(ol) {
+    margin-bottom: 18px;
+    padding-left: 24px;
+  }
+
+  .article-body :global(li) {
+    margin-bottom: 6px;
+    list-style-type: '— ';
+  }
+  .article-body :global(li)::marker {
+    color: var(--color-silver);
+  }
+
+  /* ── Typography: Code ─────────────────── */
+  .article-body :global(pre) {
+    background: var(--color-black);
+    color: var(--color-silver-light);
+    padding: 20px 24px;
+    margin: 24px 0;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.65;
+    border-radius: 2px;
+  }
+
+  .article-body :global(code) {
+    font-family: var(--font-mono);
+  }
+
+  .article-body :global(p > code) {
+    background: var(--color-silver-light);
+    padding: 2px 6px;
+    font-size: 0.85em;
+    border-radius: 2px;
+  }
+
+  /* ── Typography: Blockquote ───────────── */
+  .article-body :global(blockquote) {
+    border-left: 2px solid var(--color-blue);
+    padding: 4px 0 4px 20px;
+    margin: 24px 0;
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+  .article-body :global(blockquote p:last-child) {
+    margin-bottom: 0;
+  }
+
+  /* ── Typography: Horizontal Rule ──────── */
+  .article-body :global(hr) {
+    border: none;
+    border-top: var(--line-width) solid var(--color-silver-light);
+    margin: 48px 0;
+  }
+
+  /* ── Typography: Images ───────────────── */
+  .article-body :global(img) {
+    max-width: 100%;
+    height: auto;
+    margin: 28px 0;
+    border-radius: 2px;
+  }
+
+  /* ── Typography: Tables ───────────────── */
+  .article-body :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+    font-size: 0.9rem;
+  }
+  .article-body :global(th),
+  .article-body :global(td) {
+    border: 1px solid var(--color-silver-light);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .article-body :global(th) {
+    background: var(--color-canvas);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Prev / Next Navigation ───────────── */
+  .article-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    margin-top: 64px;
+    padding-top: 32px;
+    border-top: var(--line-width) solid var(--color-silver-light);
+  }
+
+  .article-nav-link {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-decoration: none;
+    transition: opacity var(--duration-micro);
+    max-width: 48%;
+  }
+  .article-nav-link:hover { opacity: 0.7; }
+
+  .article-nav-link--next {
+    text-align: right;
+    margin-left: auto;
+  }
+
+  .article-nav-dir {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--color-silver);
+    letter-spacing: 0.1em;
+    text-transform: lowercase;
+  }
+
+  .article-nav-title {
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-deep-blue);
+    line-height: 1.4;
+  }
+
+  /* ── Tablet (show TOC) ────────────────── */
+  @media (min-width: 900px) {
+    .article-page.has-toc {
+      max-width: 960px;
+    }
+  }
+
+  /* ── Mobile ──────────────────────────── */
+  @media (max-width: 899px) {
+    .article-page,
+    .article-page.has-toc {
+      max-width: 680px;
+      padding: 40px 16px 80px;
+    }
+
+    .article-title {
+      font-size: 1.75rem;
+    }
+
+    .article-toc {
+      display: none !important;
+    }
+
+    .article-layout {
+      gap: 0;
+    }
+
+    .article-nav {
+      flex-direction: column;
+      gap: 16px;
+    }
+    .article-nav-link {
+      max-width: 100%;
+    }
+    .article-nav-link--next {
+      text-align: left;
+      margin-left: 0;
+    }
+
+    .article-progress {
+      display: none;
+    }
+  }
+</style>

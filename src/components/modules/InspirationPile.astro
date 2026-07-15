@@ -1,0 +1,154 @@
+---
+// ============================================
+// HELICASE — Inspiration Pile
+// Editable "big ideas" checklist.
+// Add/remove/toggle. Stored in localStorage.
+// ============================================
+const defaults: Array<{ text: string; done: boolean }> = [];
+---
+
+<div class="ip-module" data-module="inspiration" id="ip-module" data-defaults={JSON.stringify(defaults)}>
+  <h3 class="ip-title">IDEAS</h3>
+  <ul class="ip-list" id="ip-list"></ul>
+  <div class="ip-add-area">
+    <button class="ip-add-btn" id="ip-add-btn">+ add</button>
+    <div class="ip-add-form" id="ip-add-form" style="display:none">
+      <input type="text" id="ip-add-input" class="ip-add-input" placeholder="idea…" maxlength="80" />
+      <button id="ip-add-save" class="ip-add-save">+</button>
+      <button id="ip-add-cancel" class="ip-add-cancel">×</button>
+    </div>
+    <button class="ip-clear-done" id="ip-clear-done" style="display:none">clear done</button>
+  </div>
+</div>
+
+<style is:global>
+  .ip-module { font-family: var(--font-mono); width: 170px; }
+  .ip-title { font: 600 0.7rem/1 var(--font-mono); color: var(--color-blue); letter-spacing: 0.15em; margin-bottom: 8px; }
+  .ip-list { display: flex; flex-direction: column; gap: 3px; }
+  .ip-item { font-size: 0.68rem; line-height: 1.3; color: var(--color-black); display: flex; align-items: flex-start; gap: 5px; cursor: pointer; }
+  .ip-check { font-family: var(--font-mono); font-size: 0.7rem; color: var(--color-silver-light); flex-shrink: 0; margin-top: 1px; transition: color var(--duration-micro); }
+  .ip-item:hover .ip-check { color: var(--color-blue); }
+  .ip-item.done .ip-check { color: var(--color-blue); }
+  .ip-item.done .ip-text { color: var(--color-silver-light); text-decoration: line-through; }
+  .ip-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .ip-edit-input { font: 400 0.68rem/1.3 var(--font-mono); border: 0.5px solid var(--color-blue); padding: 1px 4px; background: rgba(255,255,255,0.7); outline: none; color: var(--color-black); width: 100%; }
+  .ip-del, .ip-edit { font-size: 0.55rem; color: var(--color-silver-light); cursor: pointer; flex-shrink: 0; opacity: 0; transition: opacity var(--duration-micro); background: none; border: none; padding: 0 2px; }
+  .ip-item:hover .ip-del, .ip-item:hover .ip-edit { opacity: 1; }
+  .ip-del:hover { color: #c44; }
+  .ip-edit:hover { color: var(--color-blue); }
+
+  /* add */
+  .ip-add-area { margin-top: 6px; }
+  .ip-add-btn { font: 400 0.6rem/1 var(--font-mono); color: var(--color-silver-light); background: none; border: none; cursor: pointer; padding: 0; letter-spacing: 0.05em; transition: color var(--duration-micro); }
+  .ip-add-btn:hover { color: var(--color-blue); }
+  .ip-add-form { display: flex; gap: 3px; margin-top: 4px; }
+  .ip-add-input { flex: 1; font: 400 0.6rem/1 var(--font-mono); border: 0.5px solid var(--color-silver-light); padding: 3px 6px; background: rgba(255,255,255,0.5); outline: none; color: var(--color-black); min-width: 0; }
+  .ip-add-input:focus { border-color: var(--color-blue); }
+  .ip-add-save, .ip-add-cancel { font: 400 0.6rem/1 var(--font-mono); background: none; border: 0.5px solid var(--color-silver-light); padding: 3px 6px; cursor: pointer; color: var(--color-silver); flex-shrink: 0; }
+  .ip-add-save:hover { border-color: var(--color-blue); color: var(--color-blue); }
+  .ip-add-cancel:hover { color: var(--color-black); }
+  .ip-clear-done { font: 400 0.55rem/1 var(--font-mono); color: var(--color-silver-light); background: none; border: none; cursor: pointer; padding: 0; margin-top: 4px; display: block; letter-spacing: 0.03em; }
+  .ip-clear-done:hover { color: var(--color-blue); }
+
+  @media (max-width: 767px) { .ip-module { width: 100%; } }
+</style>
+
+<script>
+  const ideasWindow = window as Window & { __ideasInited?: boolean };
+  if (ideasWindow.__ideasInited) { /* skip duplicate init */ }
+  else { ideasWindow.__ideasInited = true;
+  (function() {
+  const STORE = 'helicase-ideas-v2';
+  const DEFAULTS = JSON.parse(document.getElementById('ip-module')!.dataset.defaults!);
+
+  interface Idea { text: string; done: boolean; }
+  function load(): Idea[] {
+    try { const r = localStorage.getItem(STORE); return r ? JSON.parse(r) : [...DEFAULTS]; }
+    catch { return [...DEFAULTS]; }
+  }
+  function save(d: Idea[]) { localStorage.setItem(STORE, JSON.stringify(d)); }
+
+  let ideas = load();
+  const list = document.getElementById('ip-list')!;
+  const addBtn = document.getElementById('ip-add-btn')!;
+  const addForm = document.getElementById('ip-add-form')!;
+  const addInput = document.getElementById('ip-add-input') as HTMLInputElement;
+  const addSave = document.getElementById('ip-add-save')!;
+  const addCancel = document.getElementById('ip-add-cancel')!;
+  const clearBtn = document.getElementById('ip-clear-done')!;
+
+  function render() {
+    list.innerHTML = ideas.map((item, i) => `
+      <li class="ip-item ${item.done ? 'done' : ''}" data-idx="${i}">
+        <span class="ip-check">${item.done ? '☑' : '☐'}</span>
+        <span class="ip-text">${item.text.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>
+        <button class="ip-edit" data-idx="${i}" title="edit">✎</button>
+        <button class="ip-del" data-idx="${i}" title="delete">×</button>
+      </li>
+    `).join('');
+
+    list.querySelectorAll('.ip-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if ((e.target as HTMLElement).closest('.ip-del, .ip-edit, .ip-edit-input')) return;
+        const idx = parseInt((el as HTMLElement).dataset.idx!);
+        ideas[idx].done = !ideas[idx].done;
+        save(ideas); render();
+      });
+    });
+
+    // Edit button
+    list.querySelectorAll('.ip-edit').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt((btn as HTMLElement).dataset.idx!);
+        const el = list.querySelector(`.ip-item[data-idx="${idx}"]`) as HTMLElement;
+        const textEl = el.querySelector('.ip-text') as HTMLElement;
+        const oldText = ideas[idx].text;
+        textEl.innerHTML = `<input class="ip-edit-input" value="${oldText.replace(/"/g,'&quot;')}" maxlength="80" />`;
+        const inp = textEl.querySelector('.ip-edit-input') as HTMLInputElement;
+        inp.focus(); inp.select();
+        const saveEdit = () => {
+          const v = inp.value.trim();
+          if (v && v !== oldText) { ideas[idx].text = v; save(ideas); }
+          render();
+        };
+        inp.addEventListener('blur', saveEdit);
+        inp.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') { inp.blur(); }
+          if (ev.key === 'Escape') { inp.value = oldText; inp.blur(); }
+        });
+      });
+    });
+
+    list.querySelectorAll('.ip-del').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt((btn as HTMLElement).dataset.idx!);
+        ideas.splice(idx, 1);
+        save(ideas); render();
+      });
+    });
+
+    // Show clear-done button if any items are done
+    clearBtn.style.display = ideas.some(i => i.done) ? 'block' : 'none';
+  }
+
+  addBtn.addEventListener('click', () => { addBtn.style.display='none'; addForm.style.display='flex'; addInput.focus(); });
+  function closeAdd() { addForm.style.display='none'; addBtn.style.display='block'; addInput.value=''; }
+  addSave.addEventListener('click', () => {
+    const t = addInput.value.trim();
+    if (t) { ideas.push({ text: t, done: false }); save(ideas); render(); }
+    closeAdd();
+  });
+  addCancel.addEventListener('click', closeAdd);
+  addInput.addEventListener('keydown', (e) => { if (e.key==='Enter') addSave.click(); if (e.key==='Escape') closeAdd(); });
+  clearBtn.addEventListener('click', () => {
+    ideas = ideas.filter(i => !i.done);
+    save(ideas); render();
+  });
+
+  render();
+  document.addEventListener('astro:after-swap', () => { if (document.getElementById('ip-list')) { ideas = load(); render(); } });
+  })();
+  } // end __ideasInited guard
+</script>

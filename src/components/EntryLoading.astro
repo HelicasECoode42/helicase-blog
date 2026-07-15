@@ -1,0 +1,186 @@
+---
+// ============================================
+// HELICASE — Entry Loading Overlay
+// First-visit entrance: blurry avatar → sharp,
+// ASCII "HELO" builds letter by letter,
+// progress bar fills, then "click to enter".
+// sessionStorage gate: shown once per session.
+// ============================================
+---
+
+<div id="entry-overlay" class="entry-overlay" style="display:none">
+  <div class="entry-content">
+    <!-- Avatar: blur → sharp -->
+    <div class="entry-avatar" id="entry-avatar">
+      <img
+        src="/images/avatar.svg"
+        alt="HELICASE"
+        width="120"
+        height="120"
+        loading="eager"
+        style="filter: blur(20px); transition: filter var(--duration-normal) var(--ease-mechanical);"
+      />
+    </div>
+
+    <!-- ASCII "HELO" builds character by character -->
+    <pre class="entry-ascii" id="entry-ascii"><span></span></pre>
+
+    <!-- Sky-blue progress bar -->
+    <div class="entry-progress">
+      <div class="entry-progress-bar" id="entry-progress-bar"></div>
+    </div>
+
+    <!-- Click target (hidden until animation completes) -->
+    <button class="entry-enter" id="entry-enter" style="opacity: 0; pointer-events: none;" aria-label="Enter site">
+      [ click to enter ]
+    </button>
+  </div>
+</div>
+
+<style>
+  .entry-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-canvas);
+    cursor: default;
+  }
+
+  .entry-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .entry-avatar img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+  }
+
+  .entry-ascii {
+    font-family: var(--font-mono);
+    color: var(--color-blue);
+    font-size: 14px;
+    line-height: 1.2;
+    letter-spacing: 1px;
+    white-space: pre;
+    min-height: 180px;
+    min-width: 200px;
+    text-align: center;
+  }
+
+  .entry-progress {
+    width: 200px;
+    height: 2px;
+    background: var(--color-silver-light);
+  }
+
+  .entry-progress-bar {
+    width: 0%;
+    height: 100%;
+    background: var(--color-blue);
+    transition: width 500ms var(--ease-mechanical);
+  }
+
+  .entry-enter {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--color-blue);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    transition:
+      color var(--duration-micro) var(--ease-mechanical),
+      opacity var(--duration-normal) var(--ease-mechanical);
+  }
+
+  .entry-enter:hover {
+    color: var(--color-nuclear);
+  }
+</style>
+
+<script>
+  const OVERLAY_KEY = 'helicase-entry-seen';
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  // Only show overlay on first visit
+  if (sessionStorage.getItem(OVERLAY_KEY)) {
+    // Already seen — keep hidden, remove from DOM
+    document.getElementById('entry-overlay')?.remove();
+  } else {
+    // First visit — show the overlay and animate
+    const overlay = document.getElementById('entry-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    (async function animateEntry() {
+      const overlay = document.getElementById('entry-overlay');
+      const avatar = document.getElementById('entry-avatar')?.querySelector('img');
+      const asciiSpan = document.getElementById('entry-ascii')?.querySelector('span');
+      const progressBar = document.getElementById('entry-progress-bar');
+      const enterBtn = document.getElementById('entry-enter');
+
+      if (!overlay) return;
+
+      // Phase 1: Avatar blur → sharp (800ms)
+      if (avatar) {
+        await sleep(100); // small delay for render
+        avatar.style.filter = 'blur(0)';
+      }
+      await sleep(800);
+
+      // Phase 2: ASCII "HELO" builds letter by letter (80ms per char)
+      const helo: string[] = [
+        'H   E   L   O',
+        '',
+        '█╗  █╗ █╗   █╗',
+        '██╗ ██║ ██╗  ██╗',
+        '█╔█╗█╔╝ █╔█╗ ██║',
+        '█║╚██╔╝ █║╚██╔╝',
+        '█║ ╚█╔╝ █║ ╚█╔╝',
+        '╚╝  ╚╝  ╚╝  ╚╝',
+        '',
+        '[ helicase ]',
+      ];
+
+      if (asciiSpan) {
+        for (let i = 0; i < helo.length; i++) {
+          asciiSpan.textContent += (i > 0 ? '\n' : '') + helo[i];
+          await sleep(80);
+        }
+      }
+
+      // Phase 3: Progress bar fills (500ms)
+      if (progressBar) {
+        progressBar.style.width = '100%';
+      }
+      await sleep(500);
+
+      // Phase 4: Show "click to enter"
+      if (enterBtn) {
+        enterBtn.style.opacity = '1';
+        enterBtn.style.pointerEvents = 'auto';
+      }
+
+      // Phase 5: Click → dismiss overlay
+      enterBtn?.addEventListener('click', async () => {
+        sessionStorage.setItem(OVERLAY_KEY, '1');
+
+        if (overlay) {
+          overlay.style.transition = `opacity var(--duration-layer) var(--ease-mechanical)`;
+          overlay.style.opacity = '0';
+          await sleep(450);
+          overlay.remove();
+        }
+      });
+    })();
+  }
+</script>

@@ -1,0 +1,28 @@
+---
+import profile from '../../data/profile';
+---
+
+<section class="profile-module" data-module="profile">
+  <img class="profile-avatar" src={profile.avatar} alt={profile.name} width="120" height="120" loading="eager" />
+  <div class="profile-info">
+    <span class="profile-name">{profile.name}</span>
+    <span class="profile-bio">{profile.bio}</span>
+  </div>
+  {profile.socials.length > 0 && (
+    <div class="profile-socials">
+      {profile.socials.map(link => <a href={link.url} target="_blank" rel="noopener noreferrer">{link.label}</a>)}
+    </div>
+  )}
+</section>
+
+<style>
+  .profile-module { font-family: var(--font-mono); }
+  .profile-avatar { width:120px;height:120px;object-fit:cover;margin-bottom:10px; }
+  .profile-info { display:flex;flex-direction:column;gap:3px; }
+  .profile-name { font:700 1.5rem/1.2 var(--font-mono);color:var(--color-deep-blue);letter-spacing:.08em; }
+  .profile-bio { font:.78rem/1.5 var(--font-mono);color:var(--color-text-secondary);max-width:240px; }
+  .profile-socials { display:flex;gap:10px;flex-wrap:wrap;margin-top:12px; }
+  .profile-socials a { font:.7rem var(--font-mono);color:var(--color-silver);letter-spacing:.05em; }
+  .profile-socials a:hover { color:var(--color-blue); }
+  @media(max-width:767px){.profile-module{display:flex;flex-direction:column;align-items:center;text-align:center}.profile-avatar{width:80px;height:80px}.profile-bio{max-width:100%}.profile-socials{justify-content:center}}
+</style>

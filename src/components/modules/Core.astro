@@ -1,0 +1,112 @@
+---
+// ============================================
+// HELICASE — CORE Module
+// ASCII geometric animation. Center of gravity.
+// 5 preset patterns, 8-12fps breathing.
+// Hover → blue glow. Click → cycle pattern.
+// Pauses when off-screen (IntersectionObserver).
+// ============================================
+---
+
+<div class="core-module" data-module="core" id="core-module">
+  <pre class="core-ascii" id="core-ascii" aria-label="ASCII geometric animation"></pre>
+  <span class="core-label">CORE</span>
+</div>
+
+<style>
+  .core-module {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 200px;
+    height: 200px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .core-ascii {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.25;
+    color: var(--color-black);
+    white-space: pre;
+    text-align: center;
+    cursor: pointer;
+    transition: text-shadow var(--duration-normal) var(--ease-mechanical);
+  }
+
+  .core-ascii:hover {
+    text-shadow:
+      0 0 4px rgba(51,78,213,0.15),
+      0 0 8px rgba(51,78,213,0.08),
+      0 0 16px rgba(51,78,213,0.04);
+  }
+
+  .core-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-silver);
+    letter-spacing: 0.2em;
+    margin-top: 8px;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 767px) {
+    .core-module {
+      width: 120px;
+      height: 120px;
+    }
+    .core-ascii {
+      transform: scale(0.6);
+      transform-origin: center;
+    }
+    .core-label {
+      font-size: 8px;
+      margin-top: 0;
+    }
+  }
+</style>
+
+<script>
+  import { AsciiCore, ASCII_PATTERNS, PATTERN_ORDER } from '../../lib/asciiPatterns';
+
+  const el = document.getElementById('core-ascii');
+  if (!el) throw new Error('CORE element not found');
+
+  const core = new AsciiCore(el, ASCII_PATTERNS, PATTERN_ORDER, 10);
+
+  // Render first frame immediately
+  el.textContent = ASCII_PATTERNS.hex[0];
+
+  // IntersectionObserver: pause when off-screen
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) core.start();
+        else core.stop();
+      }
+    },
+    { threshold: 0 }
+  );
+  observer.observe(document.getElementById('core-module')!);
+
+  // Click to cycle pattern
+  el.addEventListener('click', () => core.cyclePattern());
+
+  // Start animation
+  core.start();
+
+  // Cleanup on navigation away
+  document.addEventListener('astro:before-swap', () => {
+    core.stop(); observer.disconnect();
+  });
+  // Re-init on navigation back
+  document.addEventListener('astro:after-swap', () => {
+    if (document.getElementById('core-ascii')) {
+      core.start();
+      observer.observe(document.getElementById('core-module')!);
+    }
+  });
+</script>

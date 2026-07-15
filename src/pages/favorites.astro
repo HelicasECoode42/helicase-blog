@@ -1,0 +1,637 @@
+---
+// ============================================
+// HELICASE — Favorites Full Page (/favorites)
+// Bangumi search + cover grid + type filter + sort.
+// Data stored in browser localStorage.
+// ============================================
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Favorites" description="书影音归档 — HelicasE">
+  <div class="fav-page">
+    <h1 class="sr-only">FAVORITES</h1>
+    <a href="/" class="fav-back">← canvas</a>
+
+    <!-- Top bar: search + sort -->
+    <div class="fav-topbar">
+      <input type="text" id="fav-search" class="fav-search"
+        placeholder="搜索添加…" autocomplete="off" />
+      <div class="fav-sort" id="fav-sort">
+        <span class="fav-sort-label">sort</span>
+        <button class="fav-sort-btn fav-sort--active" data-sort="time">time</button>
+        <button class="fav-sort-btn" data-sort="rating">rating</button>
+      </div>
+    </div>
+
+    <!-- Type filter -->
+    <div class="fav-filters" id="fav-filters">
+      <button class="fav-filter fav-filter--active" data-type="all">全部</button>
+      <button class="fav-filter" data-type="2">动画</button>
+      <button class="fav-filter" data-type="1">书籍</button>
+      <button class="fav-filter" data-type="6">电影</button>
+      <button class="fav-filter" data-type="3">音乐</button>
+      <button class="fav-filter" data-type="4">游戏</button>
+    </div>
+
+    <!-- Grid: shows favorites OR search results -->
+    <div class="fav-grid" id="fav-grid"></div>
+
+    <!-- Edit modal -->
+    <div class="fav-overlay" id="fav-overlay" style="display:none">
+      <div class="fav-modal">
+        <button class="fav-modal-x" id="fav-modal-x">×</button>
+        <img class="fav-modal-cover" id="fav-modal-cover" src="" alt="" />
+        <div class="fav-modal-form">
+          <h2 class="fav-modal-title" id="fav-modal-title"></h2>
+          <span class="fav-modal-type" id="fav-modal-type"></span>
+          <a class="fav-modal-bgm" id="fav-modal-bgm" href="#" target="_blank" rel="noopener">bgm.tv ↗</a>
+          <div class="fav-modal-row">
+            <label>评分</label>
+            <div class="fav-stars" id="fav-stars">
+              <button class="fav-star" data-v="1">☆</button>
+              <button class="fav-star" data-v="2">☆</button>
+              <button class="fav-star" data-v="3">☆</button>
+              <button class="fav-star" data-v="4">☆</button>
+              <button class="fav-star" data-v="5">☆</button>
+              <button class="fav-star" data-v="6">☆</button>
+              <button class="fav-star" data-v="7">☆</button>
+              <button class="fav-star" data-v="8">☆</button>
+              <button class="fav-star" data-v="9">☆</button>
+              <button class="fav-star" data-v="10">☆</button>
+            </div>
+          </div>
+          <div class="fav-modal-row">
+            <label>短评</label>
+            <textarea id="fav-modal-note" rows="3" placeholder="…"></textarea>
+          </div>
+          <div class="fav-modal-btns">
+            <button id="fav-modal-save">save</button>
+            <button id="fav-modal-del" class="fav-modal-del">remove</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style is:global>
+  .fav-page {
+    max-width: 680px; margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  .fav-back {
+    font-family: var(--font-mono); font-size: 0.7rem;
+    color: var(--color-silver); letter-spacing: 0.08em;
+    margin-bottom: 28px; display: inline-block;
+    transition: color var(--duration-micro);
+  }
+  .fav-back:hover { color: var(--color-blue); }
+
+  /* ── Top bar ──────────────────────── */
+  .fav-topbar {
+    display: flex; gap: 16px; align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .fav-search {
+    flex: 1;
+    font: 400 0.85rem/1 var(--font-mono);
+    background: none; border: none;
+    border-bottom: 1px solid var(--color-silver-light);
+    padding: 6px 0; color: var(--color-black); outline: none;
+    transition: border-color var(--duration-micro);
+  }
+  .fav-search:focus { border-bottom-color: var(--color-blue); }
+  .fav-search::placeholder { color: var(--color-silver-light); }
+
+  .fav-sort {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 0.65rem;
+    flex-shrink: 0;
+  }
+  .fav-sort-label { color: var(--color-silver-light); letter-spacing: 0.05em; }
+  .fav-sort-btn {
+    font: inherit; color: var(--color-silver);
+    background: none; border: none; cursor: pointer;
+    padding: 2px 0; letter-spacing: 0.05em;
+    transition: color var(--duration-micro);
+    border-bottom: 1px solid transparent;
+  }
+  .fav-sort-btn:hover { color: var(--color-blue); }
+  .fav-sort--active { color: var(--color-blue); border-bottom-color: var(--color-blue); }
+
+  /* ── Filters ──────────────────────── */
+  .fav-filters {
+    display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .fav-filter {
+    font: 400 0.65rem/1 var(--font-mono);
+    color: var(--color-silver); background: none; border: none;
+    cursor: pointer; padding: 3px 0; letter-spacing: 0.05em;
+    border-bottom: 1px solid transparent;
+    transition: all var(--duration-micro);
+  }
+  .fav-filter--active { color: var(--color-blue); border-bottom-color: var(--color-blue); }
+  .fav-filter:hover { color: var(--color-blue); }
+
+  /* ── Grid ─────────────────────────── */
+  .fav-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  .fav-card {
+    position: relative;
+    cursor: pointer;
+    transition: opacity var(--duration-micro);
+  }
+  .fav-card:hover { opacity: 0.8; }
+
+  .fav-card-bgm {
+    position: absolute; top: 4px; right: 4px;
+    font-size: 0.65rem; color: var(--color-white);
+    background: rgba(15,17,23,0.5);
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity var(--duration-micro);
+  }
+  .fav-card:hover .fav-card-bgm { opacity: 1; }
+  .fav-card-bgm:hover { background: var(--color-blue); }
+
+  .fav-card-img {
+    width: 100%; aspect-ratio: 2/3;
+    object-fit: cover;
+    display: block;
+  }
+
+  .fav-card-body {
+    padding: 6px 0 0;
+    font-family: var(--font-mono);
+    display: flex; flex-direction: column; gap: 3px;
+  }
+
+  .fav-card-name {
+    font-family: var(--font-mono);
+    font-size: 0.75rem; color: var(--color-black);
+    line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .fav-card-meta {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem; color: var(--color-silver);
+  }
+
+  .fav-card-type {
+    color: var(--color-silver-light); letter-spacing: 0.05em;
+  }
+
+  .fav-card-stars {
+    font-family: var(--font-mono);
+    color: var(--color-blue); letter-spacing: 1.5px;
+    font-size: 0.7rem;
+  }
+
+  .fav-card-note {
+    font-family: var(--font-mono);
+    font-size: 0.65rem; color: var(--color-silver);
+    line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin-top: 2px;
+  }
+
+  .fav-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-family: var(--font-mono); font-size: 0.7rem;
+    color: var(--color-silver-light);
+    letter-spacing: 0.05em; padding: 48px 0;
+  }
+
+  /* ── Modal (frosted glass) ────────── */
+  .fav-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15,17,23,0.25);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity var(--duration-normal) var(--ease-mechanical);
+  }
+  .fav-overlay.open {
+    opacity: 1;
+  }
+
+  .fav-modal {
+    background: rgba(245,246,248,0.92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    max-width: 900px; width: 92vw;
+    padding: 48px 56px; position: relative;
+    display: flex; gap: 40px; align-items: flex-start;
+    border: 0.5px solid rgba(176,179,184,0.25);
+    transform: scale(0.95) translateY(8px);
+    transition: transform var(--duration-normal) var(--ease-mechanical);
+  }
+  .fav-overlay.open .fav-modal {
+    transform: scale(1) translateY(0);
+  }
+
+  .fav-modal-x {
+    position: absolute; top: 10px; right: 14px;
+    font-size: 1.1rem; background: none; border: none;
+    color: var(--color-silver); cursor: pointer;
+    font-family: var(--font-mono);
+    transition: color var(--duration-micro);
+  }
+  .fav-modal-x:hover { color: var(--color-black); }
+
+  .fav-modal-cover {
+    width: 160px; flex-shrink: 0;
+    aspect-ratio: 2/3; object-fit: cover;
+  }
+
+  .fav-modal-form {
+    flex: 1; display: flex; flex-direction: column; gap: 16px;
+    font-family: var(--font-mono); min-width: 0;
+  }
+
+  .fav-modal-title {
+    font-size: 1.15rem; font-weight: 600;
+    color: var(--color-black); line-height: 1.3;
+  }
+
+  .fav-modal-type {
+    font-size: 0.65rem; color: var(--color-silver-light);
+    letter-spacing: 0.08em; margin-top: -10px;
+  }
+
+  .fav-modal-bgm {
+    font-family: var(--font-mono); font-size: 0.6rem;
+    color: var(--color-silver); letter-spacing: 0.05em;
+    transition: color var(--duration-micro);
+  }
+  .fav-modal-bgm:hover { color: var(--color-blue); }
+
+  .fav-modal-row {
+    display: flex; flex-direction: column; gap: 5px;
+  }
+
+  .fav-modal-row label {
+    font-size: 0.6rem; color: var(--color-silver);
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+
+  .fav-stars { display: flex; gap: 2px; }
+
+  .fav-star {
+    font-size: 1.4rem; background: none; border: none; cursor: pointer;
+    color: var(--color-silver-light); padding: 0; line-height: 1;
+    transition: color var(--duration-micro);
+  }
+  .fav-star.on { color: var(--color-blue); }
+  .fav-star:hover { color: var(--color-blue); }
+
+  .fav-modal-row textarea {
+    font: 400 0.8rem/1.5 var(--font-mono);
+    background: rgba(255,255,255,0.5);
+    border: 0.5px solid rgba(176,179,184,0.3);
+    padding: 10px 12px; outline: none; color: var(--color-black);
+    resize: vertical; min-height: 60px;
+  }
+  .fav-modal-row textarea:focus {
+    background: rgba(255,255,255,0.8);
+    border-color: var(--color-blue);
+  }
+
+  .fav-modal-btns { display: flex; gap: 10px; }
+
+  .fav-modal-btns button {
+    font: 400 0.7rem/1 var(--font-mono);
+    background: rgba(255,255,255,0.4);
+    border: 0.5px solid rgba(176,179,184,0.25);
+    padding: 7px 18px; cursor: pointer; letter-spacing: 0.05em;
+    color: var(--color-black);
+    transition: all var(--duration-micro);
+  }
+
+  #fav-modal-save:hover { background: rgba(51,78,213,0.08); border-color: var(--color-blue); color: var(--color-blue); }
+  .fav-modal-del { margin-left: auto; }
+  .fav-modal-del:hover { background: rgba(200,0,0,0.05); border-color: #c44; color: #c44; }
+
+  @media (max-width: 767px) {
+    .fav-grid { grid-template-columns: repeat(3, 1fr); }
+    .fav-modal { flex-direction: column; padding: 24px; }
+    .fav-modal-cover { width: 80px; }
+    .fav-page { padding: 32px 14px 60px; }
+  }
+</style>
+
+<script>
+  const STORE = 'helicase-favorites';
+  const TYPE_LABELS: Record<number, string> = { 1:'书籍', 2:'动画', 3:'音乐', 4:'游戏', 6:'电影' };
+
+  interface FavItem {
+    bgmId: number; name: string; name_cn: string; cover: string;
+    type: number; typeLabel: string;
+    rating: number; note: string; addedAt: string;
+  }
+
+  function load(): FavItem[] {
+    try { const r = localStorage.getItem(STORE); return r ? JSON.parse(r) : []; }
+    catch { return []; }
+  }
+  function save(items: FavItem[]) { localStorage.setItem(STORE, JSON.stringify(items)); }
+
+  let favs = load();
+  let activeFilter = 'all';
+  let activeSort = 'time';
+  let searchCache = new Map<number, any>();
+  let searchTimer = 0;
+  let editingItem: FavItem | null = null;
+
+  // DOM
+  const searchInp = document.getElementById('fav-search') as HTMLInputElement;
+  const gridEl    = document.getElementById('fav-grid')!;
+  const overlayEl = document.getElementById('fav-overlay')!;
+  const modalX    = document.getElementById('fav-modal-x')!;
+  const modalCover = document.getElementById('fav-modal-cover') as HTMLImageElement;
+  const modalTitle = document.getElementById('fav-modal-title')!;
+  const modalType  = document.getElementById('fav-modal-type')!;
+  const modalNote  = document.getElementById('fav-modal-note') as HTMLTextAreaElement;
+  const modalSave  = document.getElementById('fav-modal-save')!;
+  const modalDel   = document.getElementById('fav-modal-del')!;
+  const starsEl    = document.getElementById('fav-stars')!;
+  let starValue = 7;
+
+  // ── Star rating ─────────────────────
+  starsEl.querySelectorAll('.fav-star').forEach(s => {
+    s.addEventListener('click', () => {
+      starValue = parseInt((s as HTMLElement).dataset.v!);
+      updateStars();
+    });
+  });
+  function updateStars() {
+    starsEl.querySelectorAll('.fav-star').forEach(s => {
+      const v = parseInt((s as HTMLElement).dataset.v!);
+      s.classList.toggle('on', v <= starValue);
+      s.textContent = v <= starValue ? '★' : '☆';
+    });
+  }
+  function setStars(n: number) { starValue = n; updateStars(); }
+
+  // ── Render grid ────────────────────
+  function renderGrid(items?: FavItem[]) {
+    const source = items || favs;
+    const filtered = activeFilter === 'all'
+      ? [...source]
+      : source.filter(f => f.type === parseInt(activeFilter));
+
+    // Sort
+    if (activeSort === 'rating') filtered.sort((a, b) => b.rating - a.rating);
+    else filtered.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+
+    if (!filtered.length) {
+      const isSearch = !!items;
+      gridEl.innerHTML = `<div class="fav-empty">${isSearch ? '无结果' : '还没有收藏 — 在上方搜索 Bangumi 添加'}</div>`;
+      return;
+    }
+
+    gridEl.innerHTML = filtered.map(f => `
+      <div class="fav-card" data-id="${f.bgmId}">
+        <img class="fav-card-img" src="${esc(f.cover)}" alt="${esc(f.name_cn || f.name)}" loading="lazy" />
+        <div class="fav-card-body">
+          <span class="fav-card-name">${esc(f.name_cn || f.name)}</span>
+          <span class="fav-card-meta">
+            <span class="fav-card-type">${f.typeLabel}</span>
+            <span class="fav-card-stars">${'★'.repeat(Math.round(f.rating / 2))}${'☆'.repeat(5 - Math.round(f.rating / 2))}</span>
+          </span>
+          ${f.note ? `<span class="fav-card-note">${esc(f.note)}</span>` : ''}
+        </div>
+        <a class="fav-card-bgm" href="https://bgm.tv/subject/${f.bgmId}" target="_blank" rel="noopener" title="Bangumi">↗</a>
+      </div>
+    `).join('');
+
+    // Click card → edit
+    gridEl.querySelectorAll('.fav-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = parseInt((card as HTMLElement).dataset.id!);
+        const item = favs.find(f => f.bgmId === id);
+        if (item) openEdit(item);
+      });
+    });
+  }
+
+  // ── Search ──────────────────────────
+  async function searchBgm(q: string, typeFilter?: number): Promise<any[]> {
+    if (q.length < 1) return [];
+    searchCache.clear();
+    const kw = encodeURIComponent(q);
+    const getUrl = `https://api.bgm.tv/search/subject/${kw}?responseGroup=small&max_results=12`;
+    const proxies = [
+      getUrl,
+      `https://corsproxy.io/?${encodeURIComponent(getUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(getUrl)}`,
+    ];
+    for (const url of proxies) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const json = await res.json();
+        const raw: any[] = json.list || json.data || [];
+        if (!raw.length) continue;
+        let results = raw.map((r: any) => ({
+          id: r.id, name: r.name||'', name_cn: r.name_cn||'',
+          cover: (r.images?.common||r.images?.large||'').replace(/^http:/,'https:'),
+          type: r.type||0, typeLabel: TYPE_LABELS[r.type]||'其他',
+          rating: r.rating?.score??null,
+        }));
+        results = rank(q, results);
+        if (typeFilter) results = results.filter(r => r.type === typeFilter);
+        results.forEach(r => searchCache.set(r.id, r));
+        return results.slice(0, 12);
+      } catch { continue; }
+    }
+    // Fallback: v0 POST via multiple proxies
+    const v0Url = 'https://api.bgm.tv/v0/search/subjects?limit=20';
+    const v0Proxies = [
+      `https://corsproxy.io/?${encodeURIComponent(v0Url)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(v0Url)}`,
+    ];
+    for (const proxyUrl of v0Proxies) {
+      try {
+        const body: any = { keyword: q, sort: 'match' };
+        if (typeFilter) body.filter = { type: [typeFilter] };
+        const v0Res = await fetch(proxyUrl, {
+          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+        });
+        if (v0Res.ok) {
+          const json = await v0Res.json();
+          const results = (json.data||[]).map((r: any) => ({
+            id: r.id, name: r.name||'', name_cn: r.name_cn||'',
+            cover: (r.images?.common||r.images?.large||'').replace(/^http:/,'https:'),
+            type: r.type||0, typeLabel: TYPE_LABELS[r.type]||'其他',
+            rating: r.rating?.score??null,
+          }));
+          results.forEach((r: any) => searchCache.set(r.id, r));
+          return rank(q, results).slice(0, 12);
+        }
+      } catch {}
+    }
+    return [];
+  }
+
+  function rank(q: string, items: any[]): any[] {
+    const query = q.toLowerCase().trim();
+    return items.map(item => {
+      const t = (item.name_cn || item.name).toLowerCase().trim();
+      let s = 0;
+      if (t === query) s += 100;
+      else if (t.startsWith(query)) s += 60;
+      else if (t.includes(query)) s += 25;
+      for (const w of query.split(/\s+/)) {
+        if (w.length >= 2 && t.includes(w)) s += 8;
+      }
+      return {...item, _s: s};
+    }).sort((a, b) => b._s - a._s);
+  }
+
+  function triggerSearch() {
+    clearTimeout(searchTimer);
+    const q = searchInp.value.trim();
+    if (!q) { renderGrid(); return; }
+    const typeFilter = activeFilter === 'all' ? undefined : parseInt(activeFilter);
+    searchTimer = window.setTimeout(async () => {
+      const results = await searchBgm(q, typeFilter);
+      // Convert to display items (not yet saved)
+      const display: FavItem[] = results.map(r => ({
+        bgmId: r.id, name: r.name, name_cn: r.name_cn,
+        cover: r.cover, type: r.type, typeLabel: r.typeLabel,
+        rating: Math.round((r.rating || 7) / 2) * 2, note: '',
+        addedAt: '',
+      }));
+      renderGrid(display);
+    }, 350);
+  }
+
+  searchInp.addEventListener('input', triggerSearch);
+
+  // ── Filters + Sort ──────────────────
+  document.getElementById('fav-filters')!.querySelectorAll('.fav-filter').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fav-filter').forEach(b => b.classList.remove('fav-filter--active'));
+      btn.classList.add('fav-filter--active');
+      activeFilter = (btn as HTMLElement).dataset.type!;
+      triggerSearch();
+    });
+  });
+
+  document.getElementById('fav-sort')!.querySelectorAll('.fav-sort-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fav-sort-btn').forEach(b => b.classList.remove('fav-sort--active'));
+      btn.classList.add('fav-sort--active');
+      activeSort = (btn as HTMLElement).dataset.sort!;
+      if (searchInp.value.trim()) triggerSearch();
+      else renderGrid();
+    });
+  });
+
+  // ── Modal: Add / Edit ──────────────
+  function openAdd(bgm: any) {
+    editingItem = null;
+    modalCover.src = bgm.cover;
+    modalTitle.textContent = bgm.name_cn || bgm.name;
+    modalType.textContent = bgm.typeLabel;
+    (document.getElementById('fav-modal-bgm') as HTMLAnchorElement).href = `https://bgm.tv/subject/${bgm.id}`;
+    setStars(7);
+    modalNote.value = '';
+    modalDel.style.display = 'none';
+    openModal(() => {
+      favs.push({
+        bgmId: bgm.id, name: bgm.name, name_cn: bgm.name_cn,
+        cover: bgm.cover, type: bgm.type, typeLabel: bgm.typeLabel,
+        rating: starValue, note: modalNote.value.trim(),
+        addedAt: new Date().toISOString(),
+      });
+      save(favs); renderGrid();
+      searchInp.value = '';
+      closeModal();
+    });
+  }
+
+  function openEdit(item: FavItem) {
+    editingItem = item;
+    modalCover.src = item.cover;
+    modalTitle.textContent = item.name_cn || item.name;
+    modalType.textContent = item.typeLabel;
+    (document.getElementById('fav-modal-bgm') as HTMLAnchorElement).href = `https://bgm.tv/subject/${item.bgmId}`;
+    setStars(item.rating);
+    modalNote.value = item.note;
+    modalDel.style.display = 'block';
+    openModal(() => {
+      item.rating = starValue;
+      item.note = modalNote.value.trim();
+      save(favs); renderGrid();
+      closeModal();
+    });
+  }
+
+  function openModal(onSave: () => void) {
+    overlayEl.style.display = 'flex';
+    requestAnimationFrame(() => requestAnimationFrame(() => overlayEl.classList.add('open')));
+    modalSave.onclick = onSave;
+    modalDel.onclick = () => {
+      if (editingItem) {
+        favs = favs.filter(f => f.bgmId !== editingItem!.bgmId);
+        save(favs); renderGrid();
+      }
+      closeModal();
+    };
+  }
+
+  function closeModal() {
+    overlayEl.classList.remove('open');
+    setTimeout(() => { overlayEl.style.display = 'none'; editingItem = null; }, 350);
+  }
+
+  modalX.addEventListener('click', closeModal);
+  overlayEl.addEventListener('click', (e) => { if (e.target === overlayEl) closeModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && overlayEl.style.display === 'flex') closeModal();
+  });
+
+  // Bind search result clicks (delegated)
+  gridEl.addEventListener('click', (e) => {
+    const card = (e.target as HTMLElement).closest('.fav-card') as HTMLElement;
+    if (!card) return;
+    const id = parseInt(card.dataset.id!);
+    // If this is a search result (not yet saved), add it
+    const existing = favs.find(f => f.bgmId === id);
+    if (existing) {
+      openEdit(existing);
+    } else {
+      const bgm = searchCache.get(id);
+      if (bgm) openAdd(bgm);
+    }
+  });
+
+  // Init
+  renderGrid();
+
+  // Re-render on View Transition navigation back to this page
+  document.addEventListener('astro:after-swap', () => {
+    favs = load();
+    if (document.getElementById('fav-grid')) renderGrid();
+  });
+
+  function esc(s: string) {
+    return s?.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') || '';
+  }
+</script>

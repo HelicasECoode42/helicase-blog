@@ -1,0 +1,524 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Zine" description="艺廊">
+  <div class="zine-page">
+    <h1 class="sr-only">ZINE</h1>
+    <!-- Gallery wall -->
+    <div class="gallery-wall" id="zine-wall"></div>
+
+    <!-- Empty state -->
+    <div class="gallery-empty" id="zine-empty">
+      <p class="gallery-empty-icon">🖼</p>
+      <p>drop an image url or select a file</p>
+      <div class="gallery-empty-actions">
+        <input type="text" id="zine-url-inp" placeholder="https://…" />
+        <button id="zine-url-add">paste</button>
+        <label class="gallery-upload-label">
+          choose file<input type="file" id="zine-file-inp" accept="image/*" multiple hidden />
+        </label>
+      </div>
+    </div>
+
+    <!-- Upload bar (top, subtle — only visible when there are photos) -->
+    <div class="gallery-upload" id="gallery-upload">
+      <input type="text" id="zine-url-inp-top" placeholder="url…" />
+      <button id="zine-url-add-top">+</button>
+      <label>+<input type="file" id="zine-file-inp-top" accept="image/*" multiple hidden /></label>
+    </div>
+
+    <!-- Lightbox / Art viewer -->
+    <div class="lightbox" id="lightbox">
+      <button class="lightbox-close" id="lightbox-close">×</button>
+      <button class="lightbox-del" id="lightbox-del" title="delete">
+        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3h4v1M4 4v7h6V4" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+      </button>
+      <button class="lightbox-prev" id="lightbox-prev">‹</button>
+      <div class="lightbox-main">
+        <img id="lightbox-img" src="" alt="" />
+        <p class="lightbox-cap" id="lightbox-cap"></p>
+      </div>
+      <button class="lightbox-next" id="lightbox-next">›</button>
+
+      <!-- Commentary panel (right side) — like an art gallery plaque -->
+      <div class="commentary" id="commentary">
+        <div class="commentary-header">
+          <span class="commentary-title">notes</span>
+          <span class="commentary-count" id="commentary-count"></span>
+        </div>
+
+        <!-- Identity (lightweight, swap with auth later) -->
+        <div class="commentary-identity">
+          <input type="text" id="identity-name" placeholder="your name…" maxlength="24" />
+          <button id="identity-save">set</button>
+        </div>
+
+        <div class="commentary-list" id="commentary-list"></div>
+        <div class="commentary-input-row">
+          <input type="text" id="commentary-input" placeholder="留下你的感受…" maxlength="200" />
+          <button id="commentary-send">send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline src="/zine.js"></script>
+</BaseLayout>
+
+<style is:global>
+  /* ── Page ──────────────────────────── */
+  .zine-page {
+    min-height: 100vh;
+    padding: 60px 32px 80px;
+    background: var(--color-canvas);
+  }
+
+  /* ── Gallery Wall ──────────────────── */
+  .gallery-wall {
+    columns: 3;
+    column-gap: 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .gallery-piece {
+    break-inside: avoid;
+    margin-bottom: 20px;
+    position: relative;
+    cursor: pointer;
+    transition: opacity 0.3s var(--ease-mechanical), transform 0.3s var(--ease-mechanical);
+    animation: piece-in 0.5s var(--ease-mechanical) both;
+  }
+
+  @keyframes piece-in {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .gallery-piece:hover {
+    transform: translateY(-2px);
+  }
+
+  .gallery-piece img {
+    width: 100%;
+    display: block;
+    border: 1px solid var(--color-silver-light);
+  }
+
+  /* piece plaque */
+  .gallery-piece-plaque {
+    margin-top: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--color-silver);
+    letter-spacing: 0.04em;
+    text-align: right;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .gallery-piece-plaque .plaque-note {
+    color: var(--color-blue);
+    font-style: italic;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gallery-piece-plaque .plaque-comments {
+    color: var(--color-silver-light);
+  }
+
+  /* ── Empty State ───────────────────── */
+  .gallery-empty {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    font-family: var(--font-mono);
+    color: var(--color-silver);
+  }
+
+  .gallery-empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    filter: grayscale(1);
+    opacity: 0.4;
+  }
+
+  .gallery-empty p {
+    font-size: 0.8rem;
+    margin-bottom: 20px;
+  }
+
+  .gallery-empty-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .gallery-empty-actions input {
+    font: 400 0.7rem/1 var(--font-mono);
+    background: var(--color-white);
+    border: 1px solid var(--color-silver-light);
+    padding: 8px 12px;
+    color: var(--color-black);
+    outline: none;
+    width: 200px;
+  }
+
+  .gallery-empty-actions input:focus {
+    border-color: var(--color-blue);
+  }
+
+  .gallery-empty-actions button,
+  .gallery-empty-actions label {
+    font: 400 0.7rem/1 var(--font-mono);
+    background: none;
+    border: 1px solid var(--color-silver);
+    padding: 8px 16px;
+    cursor: pointer;
+    color: var(--color-black);
+    letter-spacing: 0.04em;
+    transition: all 0.15s;
+  }
+
+  .gallery-empty-actions button:hover,
+  .gallery-empty-actions label:hover {
+    border-color: var(--color-blue);
+    color: var(--color-blue);
+  }
+
+  /* ── Upload Bar (subtle) ───────────── */
+  .gallery-upload {
+    position: fixed;
+    top: 48px;
+    right: 20px;
+    z-index: 20;
+    display: none;
+    gap: 6px;
+    align-items: center;
+    font-family: var(--font-mono);
+  }
+
+  .gallery-upload.has-photos {
+    display: flex;
+  }
+
+  .gallery-upload input {
+    font: 400 0.6rem/1 var(--font-mono);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--color-silver-light);
+    padding: 4px 0;
+    color: var(--color-black);
+    outline: none;
+    width: 120px;
+  }
+
+  .gallery-upload input:focus {
+    border-bottom-color: var(--color-blue);
+  }
+
+  .gallery-upload button,
+  .gallery-upload label {
+    font: 400 0.6rem/1 var(--font-mono);
+    color: var(--color-silver);
+    background: none;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: color 0.15s;
+    padding: 0;
+  }
+
+  .gallery-upload button:hover,
+  .gallery-upload label:hover {
+    color: var(--color-blue);
+  }
+
+  /* ── Lightbox ──────────────────────── */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(245,246,248,0.97);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .lightbox.open {
+    display: flex;
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    font-family: var(--font-mono);
+    font-size: 1.4rem;
+    color: var(--color-silver);
+    background: none;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+    transition: color 0.15s;
+  }
+
+  .lightbox-close:hover {
+    color: var(--color-black);
+  }
+
+  .lightbox-del {
+    position: absolute;
+    top: 22px;
+    right: 56px;
+    color: var(--color-silver-light);
+    background: none;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+    padding: 4px;
+    transition: all 0.2s var(--ease-mechanical);
+  }
+
+  .lightbox-del:hover {
+    color: #c44;
+    transform: scale(1.15);
+  }
+
+  .lightbox-prev, .lightbox-next {
+    font-family: var(--font-mono);
+    font-size: 2rem;
+    color: var(--color-silver);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 20px 16px;
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .lightbox-prev:hover, .lightbox-next:hover {
+    color: var(--color-blue);
+  }
+
+  .lightbox-main {
+    flex: 1;
+    max-width: 55%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    animation: lb-fade-in 0.35s var(--ease-mechanical) both;
+  }
+
+  @keyframes lb-fade-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .lightbox-main img {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    border: 1px solid var(--color-silver-light);
+  }
+
+  .lightbox-cap {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    max-width: 400px;
+  }
+
+  /* ── Commentary Panel (right side) ──── */
+  .commentary {
+    width: 280px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--color-silver-light);
+    background: rgba(245,246,248,0.8);
+    padding: 60px 20px 24px;
+    font-family: var(--font-mono);
+    animation: commentary-slide 0.4s var(--ease-mechanical) both;
+  }
+
+  @keyframes commentary-slide {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .commentary-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-silver-light);
+  }
+
+  .commentary-title {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--color-blue);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .commentary-count {
+    font-size: 0.6rem;
+    color: var(--color-silver-light);
+  }
+
+  /* Identity */
+  .commentary-identity {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .commentary-identity input {
+    flex: 1;
+    font: 400 0.65rem/1 var(--font-mono);
+    background: var(--color-white);
+    border: 1px solid var(--color-silver-light);
+    padding: 5px 8px;
+    color: var(--color-black);
+    outline: none;
+  }
+
+  .commentary-identity input:focus {
+    border-color: var(--color-blue);
+  }
+
+  .commentary-identity button {
+    font: 400 0.6rem/1 var(--font-mono);
+    background: none;
+    border: 1px solid var(--color-silver-light);
+    padding: 5px 8px;
+    cursor: pointer;
+    color: var(--color-silver);
+    transition: all 0.15s;
+  }
+
+  .commentary-identity button:hover {
+    border-color: var(--color-blue);
+    color: var(--color-blue);
+  }
+
+  .commentary-item-author {
+    color: var(--color-blue);
+    font-weight: 500;
+  }
+
+  .commentary-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-right: 4px;
+  }
+
+  .commentary-item {
+    animation: note-in 0.3s var(--ease-mechanical) both;
+  }
+
+  @keyframes note-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .commentary-item-text {
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--color-black);
+  }
+
+  .commentary-item-meta {
+    font-size: 0.6rem;
+    color: var(--color-silver-light);
+    margin-top: 2px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .commentary-item-del {
+    color: var(--color-silver-light);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    padding: 0;
+    transition: color 0.15s;
+  }
+
+  .commentary-item-del:hover {
+    color: #c44;
+  }
+
+  .commentary-input-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-silver-light);
+  }
+
+  .commentary-input-row input {
+    flex: 1;
+    font: 400 0.7rem/1 var(--font-mono);
+    background: var(--color-white);
+    border: 1px solid var(--color-silver-light);
+    padding: 8px 10px;
+    color: var(--color-black);
+    outline: none;
+  }
+
+  .commentary-input-row input:focus {
+    border-color: var(--color-blue);
+  }
+
+  .commentary-input-row button {
+    font: 400 0.65rem/1 var(--font-mono);
+    background: var(--color-blue);
+    color: var(--color-white);
+    border: none;
+    padding: 8px 14px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    transition: background 0.15s;
+  }
+
+  .commentary-input-row button:hover {
+    background: var(--color-deep-blue);
+  }
+
+  /* ── Mobile ────────────────────────── */
+  @media (max-width: 1024px) {
+    .gallery-wall { columns: 2; column-gap: 12px; }
+    .gallery-piece { margin-bottom: 12px; }
+    .lightbox { flex-direction: column; }
+    .lightbox-main { max-width: 90%; }
+    .commentary { width: 100%; height: auto; max-height: 35vh; border-left: none; border-top: 1px solid var(--color-silver-light); padding: 20px; }
+  }
+
+  @media (max-width: 767px) {
+    .zine-page { padding: 48px 12px 60px; }
+    .gallery-wall { columns: 2; column-gap: 8px; }
+    .gallery-piece { margin-bottom: 8px; }
+    .lightbox-prev, .lightbox-next { padding: 12px 8px; font-size: 1.5rem; }
+    .lightbox-main { max-width: 95%; }
+  }
+</style>

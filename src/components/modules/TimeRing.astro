@@ -1,0 +1,273 @@
+---
+// ============================================
+// HELICASE — TimeRing Module
+// SVG ring. 365 segments per year.
+// Click cycles: year(12) → month(~30) → week(7) → day(24).
+// 3-layer SVG opacity crossfade for smooth transitions.
+// Marker dot at current position.
+// ============================================
+---
+
+<div class="timering-module" data-module="timering" id="timering-module">
+  <svg viewBox="0 0 120 120" class="time-ring" id="time-ring-svg">
+    <!-- Background track (always visible) -->
+    <circle cx="60" cy="60" r="48"
+      fill="none"
+      stroke="var(--color-silver-light)"
+      stroke-width="5"
+      stroke-linecap="round"
+    />
+
+    <!-- Progress ring (current dimension, fade-out layer) -->
+    <circle id="ring-current" cx="60" cy="60" r="48"
+      fill="none"
+      stroke="var(--color-blue)"
+      stroke-width="5"
+      stroke-linecap="round"
+      stroke-dashoffset="0"
+      transform="rotate(-90 60 60)"
+      style="transition: opacity var(--duration-normal) var(--ease-mechanical);"
+    />
+
+    <!-- Progress ring (next dimension, fade-in layer) -->
+    <circle id="ring-next" cx="60" cy="60" r="48"
+      fill="none"
+      stroke="var(--color-blue)"
+      stroke-width="5"
+      stroke-linecap="round"
+      stroke-dashoffset="0"
+      transform="rotate(-90 60 60)"
+      opacity="0"
+      style="transition: opacity var(--duration-normal) var(--ease-mechanical);"
+    />
+
+    <!-- Today's marker -->
+    <circle id="ring-marker" r="2.5" fill="var(--color-blue)" />
+  </svg>
+
+  <!-- Center text -->
+  <div class="time-ring-center" id="time-ring-center">
+    <span class="time-ring-num" id="ring-num">...</span>
+    <span class="time-ring-sep">/</span>
+    <span class="time-ring-total" id="ring-total">...</span>
+  </div>
+  <time class="live-clock" id="home-live-clock">--:--:--</time>
+</div>
+
+<style>
+  .timering-module {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .time-ring {
+    width: 120px;
+    height: 120px;
+  }
+
+  .time-ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    pointer-events: none;
+  }
+
+  .time-ring-num {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-deep-blue);
+    letter-spacing: 0.05em;
+  }
+
+  .time-ring-sep {
+    font-size: 14px;
+    color: var(--color-silver);
+    margin: 0 1px;
+  }
+
+  .time-ring-total {
+    font-size: 14px;
+    color: var(--color-silver);
+  }
+
+  .live-clock{position:absolute;left:50%;bottom:-5px;transform:translateX(-50%);font:500 10px/1 var(--font-mono);letter-spacing:.12em;color:var(--color-blue);white-space:nowrap}
+
+  @media (max-width: 767px) {
+    .timering-module {
+      width: 100px;
+      height: 100px;
+    }
+    .time-ring {
+      width: 90px;
+      height: 90px;
+    }
+    .time-ring-num { font-size: 14px; }
+    .time-ring-total { font-size: 11px; }
+  }
+</style>
+
+<script>
+  const CIRCUM = 2 * Math.PI * 48; // 301.59
+
+  interface Dimension {
+    key: string;
+    label: string;
+    getTotal: () => number;
+    getCompleted: () => number;
+  }
+
+  function daysInMonth(): number {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  }
+
+  function dayOfYear(): number {
+    const d = new Date();
+    const start = new Date(d.getFullYear(), 0, 0);
+    return Math.floor((d.getTime() - start.getTime()) / 86400000);
+  }
+
+  const dims: Dimension[] = [
+    {
+      key: 'year',
+      label: 'Year',
+      getTotal: () => 12,
+      getCompleted: () => new Date().getMonth(), // 0-11
+    },
+    {
+      key: 'month',
+      label: 'Month',
+      getTotal: () => daysInMonth(),
+      getCompleted: () => new Date().getDate() - 1, // 0-based
+    },
+    {
+      key: 'week',
+      label: 'Week',
+      getTotal: () => 7,
+      getCompleted: () => new Date().getDay(), // 0=Sun
+    },
+    {
+      key: 'day',
+      label: 'Day',
+      getTotal: () => 24,
+      getCompleted: () => new Date().getHours(),
+    },
+  ];
+
+  let dimIdx = 0;
+  let transitioning = false;
+
+  const currentRing = document.querySelector<SVGCircleElement>('#ring-current')!;
+  const nextRing    = document.querySelector<SVGCircleElement>('#ring-next')!;
+  const markerDot   = document.querySelector<SVGCircleElement>('#ring-marker')!;
+  const numEl       = document.getElementById('ring-num')!;
+  const totalEl     = document.getElementById('ring-total')!;
+
+  // ── Stroke-dasharray calculation ─────
+  function dashFor(dim: Dimension): { progressDash: string; totalSegs: number; completed: number } {
+    const total = dim.getTotal();
+    const completed = dim.getCompleted();
+    const gap = total > 100 ? 0.4 : 1.5;
+    const segArc = (CIRCUM / total) - gap;
+    const segLen = segArc + gap;
+    const progressLen = completed * segLen;
+    const remainingLen = CIRCUM - progressLen;
+    return {
+      progressDash: `${Math.max(0, progressLen)} ${Math.max(0, remainingLen)}`,
+      totalSegs: total,
+      completed,
+    };
+  }
+
+  // ── Marker position ──────────────────
+  function markerAngle(completed: number, total: number): { x: number; y: number } {
+    const angle = (completed / total) * 360 - 90; // -90 = 12 o'clock start
+    const rad = angle * (Math.PI / 180);
+    return { x: 60 + 48 * Math.cos(rad), y: 60 + 48 * Math.sin(rad) };
+  }
+
+  // ── Update display ───────────────────
+  function updateRing(dim: Dimension, ring: SVGCircleElement) {
+    const { progressDash, totalSegs, completed } = dashFor(dim);
+    ring.setAttribute('stroke-dasharray', progressDash);
+    const { x, y } = markerAngle(completed, totalSegs);
+    markerDot.setAttribute('cx', String(x));
+    markerDot.setAttribute('cy', String(y));
+    numEl.textContent = String(completed + 1);
+    totalEl.textContent = String(totalSegs);
+  }
+
+  // Initial render
+  updateRing(dims[0], currentRing);
+  const clockEl = document.getElementById('home-live-clock');
+  function updateClock() {
+    if (clockEl) clockEl.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  }
+  updateClock();
+
+  // ── Dimension cycling (3-layer crossfade) ──
+  async function cycle() {
+    if (transitioning) return;
+    transitioning = true;
+
+    const prev = dims[dimIdx];
+    dimIdx = (dimIdx + 1) % dims.length;
+    const next = dims[dimIdx];
+
+    // Prepare next ring with new dasharray
+    updateRing(next, nextRing);
+
+    // Crossfade: current → transparent, next → opaque
+    currentRing.style.opacity = '0';
+    nextRing.style.opacity = '1';
+
+    await sleep(350);
+
+    // Swap: copy next's dasharray to current, hide next
+    const ns = nextRing.getAttribute('stroke-dasharray')!;
+    currentRing.setAttribute('stroke-dasharray', ns);
+    currentRing.style.opacity = '1';
+    nextRing.style.opacity = '0';
+
+    transitioning = false;
+  }
+
+  function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── Click handler ────────────────────
+  document.getElementById('timering-module')!.addEventListener('click', cycle);
+
+  // ── Real-time tick: update minute/hour ──
+  let tickTimer = 0;
+  function startTicking() {
+    clearInterval(tickTimer);
+    tickTimer = window.setInterval(() => {
+      updateClock();
+      if (transitioning) return;
+      updateRing(dims[dimIdx], currentRing);
+    }, 1000);
+  }
+  function stopTicking() { clearInterval(tickTimer); }
+  startTicking();
+
+  // IntersectionObserver
+  const obs = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) startTicking();
+      else stopTicking();
+    }
+  }, { threshold: 0 });
+  obs.observe(document.getElementById('timering-module')!);
+
+  document.addEventListener('astro:before-swap', () => {
+    stopTicking();
+    obs.disconnect();
+  });
+</script>

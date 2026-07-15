@@ -1,0 +1,328 @@
+---
+// ============================================
+// HELICASE — Blog Index (/blog)
+// Lists all posts grouped by category.
+// Shows summary + reading time per post.
+// ============================================
+import { getCollection } from 'astro:content';
+import siteConfig from '../../data/site-config.json';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+function calcReadingTime(body: string): number {
+  const raw = body.replace(/```[\s\S]*?```/g, '').replace(/`[^`]*`/g, '').replace(/[#*_\[\]!>|-]/g, '');
+  const cjk = (raw.match(/[\u4e00-\u9fff\u3400-\u4dbf]/g) || []).length;
+  const en = (raw.replace(/[\u4e00-\u9fff\u3400-\u4dbf]/g, '').match(/[a-zA-Z]+/g) || []).length;
+  return Math.max(1, Math.ceil((cjk / 300) + (en / 200)));
+}
+
+const catEntries = await Promise.all(
+  siteConfig.categories.map(async (cat) => {
+    const posts = (await getCollection('blog', ({ data }) =>
+      data.category === cat.key && !data.draft
+    )).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+    return { ...cat, posts };
+  })
+);
+
+const totalPosts = catEntries.reduce((sum, c) => sum + c.posts.length, 0);
+---
+
+<BaseLayout title="Blog" description="文章归档">
+  <div class="blog-page">
+    <a href="/" class="blog-back">← canvas</a>
+
+    <header class="blog-header">
+      <h1 class="blog-title">WRITINGS</h1>
+      <span class="blog-count">{totalPosts} posts</span>
+      <a href="/editor" class="blog-editor author-only">editor ↗</a>
+    </header>
+
+    <section class="blog-discovery" aria-label="Search and filter writings">
+      <label class="blog-search-wrap">
+        <span>SEARCH</span>
+        <input id="blog-search" type="search" placeholder="title, summary, tag, or text…" autocomplete="off" />
+      </label>
+      <div class="blog-filters" id="blog-filters" aria-label="Filter by category">
+        <button type="button" class="active" data-category="all" aria-pressed="true">ALL</button>
+        {catEntries.map(cat => <button type="button" data-category={cat.key} aria-pressed="false">{cat.label}</button>)}
+      </div>
+      <p class="blog-results" id="blog-results" aria-live="polite">{totalPosts} writings</p>
+    </section>
+
+    {catEntries.map(cat => (
+      <section class="blog-cat" data-blog-section={cat.key}>
+        <h2 class="blog-cat-title">
+          <span class="blog-cat-label">{cat.label}</span>
+          <span class="blog-cat-count">{cat.posts.length}</span>
+        </h2>
+        <ul class="blog-cat-list">
+          {cat.posts.length > 0 ? cat.posts.map(post => {
+            const mins = calcReadingTime(post.body ?? '');
+            const slug = post.id.replace(/\//g, '-');
+            return (
+              <li
+                class="blog-post-item"
+                data-category={cat.key}
+                data-search={`${post.data.title} ${post.data.summary} ${post.data.tags.join(' ')} ${post.body}`.toLocaleLowerCase('zh-CN')}
+              >
+                <a href={`/blog/${slug}`} class="blog-post-link">
+                  <span class="blog-post-main">
+                    <span class="blog-post-title">{post.data.title}</span>
+                    {post.data.summary && (
+                      <span class="blog-post-summary">{post.data.summary}</span>
+                    )}
+                  </span>
+                  <span class="blog-post-side">
+                    <span class="blog-post-mins">{mins} min</span>
+                    <time class="blog-post-date">
+                      {post.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                    </time>
+                  </span>
+                </a>
+              </li>
+            );
+          }) : <li class="blog-empty">no posts yet</li>}
+        </ul>
+      </section>
+    ))}
+  </div>
+
+  <script>
+    const searchInput = document.getElementById('blog-search') as HTMLInputElement | null;
+    const filterGroup = document.getElementById('blog-filters');
+    const resultText = document.getElementById('blog-results');
+    const postItems = Array.from(document.querySelectorAll<HTMLElement>('.blog-post-item'));
+    const categorySections = Array.from(document.querySelectorAll<HTMLElement>('[data-blog-section]'));
+    let activeCategory = 'all';
+
+    function applyDiscovery() {
+      const query = searchInput?.value.trim().toLocaleLowerCase('zh-CN') ?? '';
+      let visibleCount = 0;
+
+      for (const item of postItems) {
+        const categoryMatch = activeCategory === 'all' || item.dataset.category === activeCategory;
+        const textMatch = !query || (item.dataset.search ?? '').includes(query);
+        const visible = categoryMatch && textMatch;
+        item.hidden = !visible;
+        if (visible) visibleCount += 1;
+      }
+
+      for (const section of categorySections) {
+        const hasVisiblePost = Array.from(section.querySelectorAll<HTMLElement>('.blog-post-item')).some(item => !item.hidden);
+        section.hidden = !hasVisiblePost;
+      }
+
+      if (resultText) resultText.textContent = `${visibleCount} ${visibleCount === 1 ? 'writing' : 'writings'}`;
+    }
+
+    searchInput?.addEventListener('input', applyDiscovery);
+    filterGroup?.addEventListener('click', event => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-category]');
+      if (!button) return;
+      activeCategory = button.dataset.category ?? 'all';
+      for (const candidate of filterGroup.querySelectorAll<HTMLButtonElement>('button[data-category]')) {
+        const active = candidate === button;
+        candidate.classList.toggle('active', active);
+        candidate.setAttribute('aria-pressed', String(active));
+      }
+      applyDiscovery();
+    });
+  </script>
+</BaseLayout>
+
+<style is:global>
+  .blog-page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  .blog-back {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--color-silver);
+    letter-spacing: 0.08em;
+    transition: color var(--duration-micro);
+    margin-bottom: 24px;
+    display: inline-block;
+  }
+  .blog-back:hover { color: var(--color-blue); }
+
+  .blog-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .blog-discovery {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 24px;
+    align-items: end;
+    margin-bottom: 40px;
+    padding: 16px 0;
+    border-top: 1px solid var(--color-silver-light);
+    border-bottom: 1px solid var(--color-silver-light);
+  }
+
+  .blog-search-wrap { display: flex; align-items: baseline; gap: 14px; }
+  .blog-search-wrap span,
+  .blog-results { font: 500 0.58rem/1 var(--font-mono); color: var(--color-silver); letter-spacing: 0.12em; }
+  .blog-search-wrap input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 0;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    outline: none;
+    background: transparent;
+    color: var(--color-black);
+    font: 400 0.78rem/1.4 var(--font-mono);
+  }
+  .blog-search-wrap input:focus { border-bottom-color: var(--color-blue); }
+  .blog-search-wrap input::placeholder { color: var(--color-silver-light); }
+  .blog-filters { display: flex; gap: 12px; }
+  .blog-filters button {
+    border: 0;
+    border-bottom: 1px solid transparent;
+    padding: 4px 0;
+    background: none;
+    color: var(--color-silver);
+    font: 500 0.58rem/1 var(--font-mono);
+    letter-spacing: 0.1em;
+    cursor: pointer;
+  }
+  .blog-filters button:hover,
+  .blog-filters button.active { color: var(--color-blue); border-bottom-color: var(--color-blue); }
+  .blog-results { grid-column: 1 / -1; margin: 0; color: var(--color-silver-light); }
+
+  .blog-title {
+    font: 700 0.75rem/1 var(--font-mono);
+    color: var(--color-deep-blue);
+    letter-spacing: 0.2em;
+  }
+
+  .blog-count {
+    font: 400 0.7rem/1 var(--font-mono);
+    color: var(--color-silver);
+  }
+
+  .blog-editor {
+    margin-left: auto;
+    font: 400 0.65rem/1 var(--font-mono);
+    color: var(--color-silver);
+    letter-spacing: 0.08em;
+  }
+  .blog-editor:hover { color: var(--color-blue); }
+
+  .blog-cat {
+    margin-bottom: 44px;
+  }
+
+  .blog-cat-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-silver-light);
+  }
+
+  .blog-cat-label {
+    font: 600 0.65rem/1 var(--font-mono);
+    color: var(--color-blue);
+    letter-spacing: 0.15em;
+  }
+
+  .blog-cat-count {
+    font: 400 0.6rem/1 var(--font-mono);
+    color: var(--color-silver);
+  }
+
+  .blog-cat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    list-style: none;
+  }
+
+  .blog-post-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    font-family: var(--font-mono);
+    color: var(--color-black);
+    transition: color var(--duration-micro);
+    padding: 10px 0;
+    border-bottom: 1px solid transparent;
+  }
+  .blog-post-link:hover {
+    color: var(--color-blue);
+  }
+  .blog-post-link:hover .blog-post-title {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  .blog-post-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .blog-post-title {
+    font-size: 0.85rem;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+
+  .blog-post-summary {
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+    font-family: var(--font-body);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .blog-post-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .blog-post-mins {
+    font-size: 0.6rem;
+    color: var(--color-silver-light);
+  }
+
+  .blog-post-date {
+    font-size: 0.65rem;
+    color: var(--color-silver);
+    white-space: nowrap;
+  }
+
+  .blog-empty {
+    font-size: 0.7rem;
+    color: var(--color-silver-light);
+    font-family: var(--font-mono);
+    padding: 8px 0;
+  }
+
+  @media (max-width: 767px) {
+    .blog-page { padding: 40px 16px 80px; }
+    .blog-discovery { grid-template-columns: 1fr; align-items: stretch; }
+    .blog-filters { overflow-x: auto; padding-bottom: 2px; }
+    .blog-post-summary { display: none; }
+    .blog-post-link { gap: 12px; }
+  }
+</style>

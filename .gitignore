@@ -1,0 +1,29 @@
+# build output
+dist/
+
+# dependencies
+node_modules/
+
+# astro
+.astro/
+
+# env
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local credentials and diagnostic traces
+claudfaresecret
+node_trace*.log
+
+# Local Studio inbox: never publish private captures by accident
+.helicase/studio-state.json

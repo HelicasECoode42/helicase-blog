@@ -1,0 +1,24 @@
+---
+// ============================================
+// HELICASE DESKTOP.OS — Terminal Content
+// The ASCII CORE pattern rendered as terminal output.
+// ============================================
+import { ASCII_PATTERNS } from '../../lib/asciiPatterns';
+
+const initialFrame = ASCII_PATTERNS['hex']?.[0] ?? '> helicase v1.0\n> type help for commands';
+---
+<div class="term" id="term-output" aria-label="Terminal output">
+  <div class="term__output" id="term-lines">{initialFrame}</div>
+  <div class="term__prompt">
+    <span class="term__prompt-symbol">❯</span>
+    <input
+      class="term__input"
+      id="term-input"
+      type="text"
+      placeholder="type a command..."
+      autocomplete="off"
+      spellcheck="false"
+      aria-label="Terminal input"
+    />
+  </div>
+</div>

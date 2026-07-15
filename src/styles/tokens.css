@@ -1,0 +1,56 @@
+/* ============================================
+   HELICASE — Design Tokens
+   The single source of truth for all visual values.
+   Every component references these custom properties.
+   ============================================ */
+
+:root {
+  /* ── Color Palette ─────────────────────── */
+  --color-canvas:      #f5f6f8;   /* Cold white base, faint blue undertone */
+  --color-blue:        #334ed5;   /* Sky blue — main accent */
+  --color-deep-blue:   #1a3a5c;   /* Deep blue — titles / key text */
+  --color-black:       #0f1117;   /* Cold black — body / terminal backgrounds */
+  --color-silver:      #b0b3b8;   /* Silver gray — lines / secondary text */
+  --color-silver-light:#d8dbe0;   /* Light silver — dividers / grid lines */
+  --color-nuclear:     #c8ff00;   /* Nuclear green — extreme rarity, critical emphasis */
+  --color-white:       #ffffff;   /* White — overlay backgrounds only */
+
+  /* Derived / semantic */
+  --color-text:        var(--color-black);
+  --color-text-secondary: #6b7080;
+  --color-link-hover:  var(--color-blue);
+  --color-heatmap-empty: #e8ecf1;
+  --color-heatmap-max: var(--color-blue);
+
+  /* ── Typography ────────────────────────── */
+  --font-body:  Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
+  --font-mono:  "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, "Liberation Mono", monospace;
+  --font-zine:  'Caveat', 'LXGW WenKai', cursive;
+
+  /* Type scale — built on 4px grid increments */
+  --text-h1:      800 2.5rem/1.15 var(--font-body);    /* 40px */
+  --text-h2:      700 1.75rem/1.2 var(--font-body);    /* 28px */
+  --text-h3:      600 1.25rem/1.3 var(--font-body);    /* 20px */
+  --text-body:    400 1rem/1.6 var(--font-body);        /* 16px */
+  --text-caption: 400 0.8125rem/1.5 var(--font-body);   /* 13px */
+  --text-micro:   400 0.75rem/1.4 var(--font-body);     /* 12px */
+  --text-mono:    400 0.9375rem/1.6 var(--font-mono);   /* 15px code */
+
+  /* ── Spacing ───────────────────────────── */
+  --gap-module:   48px;   /* Standard module-to-module */
+  --gap-min:      24px;   /* Minimum spacing, tighter connections */
+  --line-width:   1px;    /* Silver connection lines */
+
+  /* ── Animation ─────────────────────────── */
+  --ease-mechanical: cubic-bezier(0.2, 0, 0.8, 1);
+  --duration-micro:   150ms;
+  --duration-normal:  300ms;
+  --duration-layer:   400ms;
+  --duration-disc:    800ms;
+
+  /* ── Grid Background ───────────────────── */
+  --grid-color:    var(--color-silver-light);
+  --grid-opacity:  0.3;
+  --grid-size-sm:  20px;
+  --grid-size-lg:  100px;
+}

@@ -1,0 +1,53 @@
+---
+// ============================================
+// HELICASE — Photo Zine Canvas Entry
+// Minimal thumbnail + ZINE + silver wireframe.
+// Click → /zine fullscreen immersive.
+// ============================================
+---
+
+<a href="/zine" class="zine-entry" data-module="zine">
+  <div class="zine-frame">
+    <span class="zine-label">ZINE</span>
+    <span class="zine-arrow">→</span>
+  </div>
+</a>
+
+<style>
+  .zine-entry {
+    display: block;
+    color: inherit;
+  }
+
+  .zine-frame {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border: 0.5px solid var(--color-silver-light);
+    width: fit-content;
+    padding: 6px 14px;
+    transition: border-color var(--duration-micro);
+  }
+
+  .zine-frame:hover {
+    border-color: var(--color-blue);
+  }
+
+  .zine-label {
+    font: 600 0.7rem/1 var(--font-mono);
+    color: var(--color-blue);
+    letter-spacing: 0.2em;
+  }
+
+  .zine-arrow {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--color-silver);
+    transition: color var(--duration-micro);
+  }
+
+  .zine-entry:hover .zine-arrow {
+    color: var(--color-blue);
+  }
+</style>

@@ -1,0 +1,147 @@
+---
+// ============================================
+// HELICASE — Base Layout
+// Every page inherits this shell.
+// Activates View Transitions, loads global CSS,
+// imports fonts via Astro (npm package resolution).
+// ============================================
+import { ClientRouter } from 'astro:transitions';
+
+// Fonts are now served via Google Fonts CDN (see <head> below).
+// This eliminates ~18MB of self-hosted font files from the build.
+
+// Global design system (Astro bundles + injects these)
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  noindex?: boolean;
+  image?: string;
+  type?: 'website' | 'article';
+}
+
+const { title, description, noindex = false, image = '/images/avatar.svg', type = 'website' } = Astro.props;
+const fullTitle = `${title} | HELICASE`;
+const resolvedDescription = description ?? 'HelicasE — 一张无边线索画布';
+const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://helicase.pages.dev');
+const socialImage = new URL(image, Astro.site ?? 'https://helicase.pages.dev');
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={resolvedDescription} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" type="application/rss+xml" title="HELICASE Writings" href="/rss.xml" />
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content="HELICASE" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={resolvedDescription} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={socialImage} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={resolvedDescription} />
+    <meta name="twitter:image" content={socialImage} />
+
+    <!-- Client-side View Transitions: MPA navigation that feels like walking on a canvas -->
+    <ClientRouter />
+
+  </head>
+  <body>
+    <!-- Site index -->
+    <nav class="topnav">
+      <a href="/" class="topnav-logo">HELICASE</a>
+      <div class="topnav-links">
+        <a href="/now">now</a>
+        <a href="/projects">work</a>
+        <a href="/blog">writings</a>
+        <a href="/interests">interests</a>
+        <a href="/links">links</a>
+        <a href="/oc">oc</a>
+        <a href="/studio" class="author-only">studio</a>
+        <a href="/about">about</a>
+      </div>
+    </nav>
+
+    <!-- Survives client-side navigation so homepage audio does not restart. -->
+    <audio id="home-audio-element" preload="metadata" transition:persist="site-audio"></audio>
+
+    <!-- Entry Loading overlay -->
+    <slot name="entry-overlay" />
+
+    <!-- Page content -->
+    <slot />
+  </body>
+</html>
+
+<style is:global>
+  .topnav {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 50;
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 10px 24px;
+    font-family: var(--font-mono);
+    background: rgba(245,246,248,0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 0.5px solid rgba(176,179,184,0.2);
+  }
+
+  .topnav-logo {
+    font-size: 0.7rem; font-weight: 600;
+    color: var(--color-deep-blue);
+    letter-spacing: 0.12em;
+    transition: color var(--duration-micro);
+  }
+  .topnav-logo:hover { color: var(--color-blue); }
+
+  .topnav-links {
+    display: flex;
+    flex-direction: row;
+    gap: 14px;
+  }
+  .topnav-links a {
+    font-size: 0.65rem;
+    color: var(--color-silver);
+    letter-spacing: 0.06em;
+    transition: color var(--duration-micro);
+    white-space: nowrap;
+  }
+  .topnav-links a:hover {
+    color: var(--color-blue);
+  }
+
+  /* Push content below the fixed index. */
+  body { padding-top: 36px; }
+  .author-only { display: none !important; }
+  html.local-author .author-only { display: inline-flex !important; }
+
+  @media (max-width: 700px) {
+    .topnav { left: 0; bottom: auto; align-items: center; gap: 12px; }
+    .topnav-links { flex-direction: row; gap: 11px; max-width: calc(100vw - 118px); overflow-x: auto; scrollbar-width: none; }
+    .topnav-links::-webkit-scrollbar { display: none; }
+  }
+
+  /* Author tools are deliberately absent from public navigation. */
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 3px;
+  }
+</style>
+
+<script is:inline>
+  (function () {
+    function markLocalAuthor() {
+      var local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      document.documentElement.classList.toggle('local-author', local);
+    }
+    document.addEventListener('astro:page-load', markLocalAuthor);
+    markLocalAuthor();
+  })();
+</script>

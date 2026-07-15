@@ -1,0 +1,70 @@
+/* ============================================
+   HELICASE — CSS Reset
+   Enforces the "boundless" aesthetic:
+   NO border-radius, NO box-shadow, NO card backgrounds.
+   This is a foundational visual law of the site.
+   ============================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border-radius: 0 !important;    /* Law #1: no rounded corners, ever */
+  box-shadow: none !important;     /* Law #2: no shadows, ever */
+}
+
+/* Remove default backgrounds — nothing looks like a card */
+body, main, section, article, aside, nav, header, footer {
+  background: transparent;
+}
+
+/* Form elements get the same treatment */
+input, textarea, select, button {
+  border-radius: 0;
+  box-shadow: none;
+  border: var(--line-width) solid var(--color-silver-light);
+  font-family: inherit;
+}
+
+/* Links: cold black by default, sky blue on hover */
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--duration-micro) var(--ease-mechanical);
+}
+
+@media (hover: hover) {
+  a:hover {
+    color: var(--color-link-hover);
+  }
+}
+
+@media (hover: none) {
+  a:active {
+    color: var(--color-link-hover);
+  }
+}
+
+/* Images: no decoration */
+img, video, canvas, svg {
+  border-radius: 0;
+  display: block;
+}
+
+/* Remove list styles by default — modules build their own */
+ul, ol {
+  list-style: none;
+}
+
+/* Code blocks inherit the cold aesthetic */
+pre, code {
+  font-family: var(--font-mono);
+}
+
+/* Selection color */
+::selection {
+  background: var(--color-blue);
+  color: var(--color-white);
+}

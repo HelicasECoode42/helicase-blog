@@ -1,0 +1,110 @@
+---
+// ============================================
+// HELICASE — Canvas Container
+// 7-track CSS Grid that positions all modules.
+// The "evidence wall" that holds everything.
+// ============================================
+---
+
+<div class="canvas">
+  <slot />
+</div>
+
+<style>
+  /* ── Mobile First: Single Column Stack ── */
+  .canvas {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-min);
+    padding: var(--gap-min);
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    position: relative;
+  }
+
+  /* ── Tablet: 2-Column Grid (768px+) ── */
+  @media (min-width: 768px) {
+    .canvas {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto;
+      gap: var(--gap-min);
+      padding: var(--gap-min);
+    }
+
+    /* Default span for modules */
+    .canvas > :global(*) {
+      min-width: 0; /* Prevent grid blowout */
+    }
+  }
+
+  /* ── Compressed Desktop: 3-Column (1024px+) ── */
+  @media (min-width: 1024px) {
+    .canvas {
+      display: grid;
+      grid-template-columns:
+        minmax(16px, 1fr)
+        minmax(180px, 240px)
+        32px
+        minmax(280px, 400px)
+        32px
+        minmax(180px, 240px)
+        minmax(16px, 1fr);
+      grid-template-rows:
+        minmax(16px, auto)
+        auto
+        32px
+        1fr
+        32px
+        auto
+        32px
+        auto
+        16px
+        auto
+        16px
+        auto
+        16px
+        auto
+        minmax(16px, auto);
+      gap: 0;
+      padding: 0;
+    }
+  }
+
+  /* ── Full Canvas: 3-Column Standard (1440px+) ── */
+  @media (min-width: 1440px) {
+    .canvas {
+      display: grid;
+      grid-template-columns:
+        [full-start] minmax(24px, 1fr)
+        [left-start] minmax(240px, 280px)
+        [left-end] 48px
+        [center-start] minmax(360px, 1fr)
+        [center-end] 48px
+        [right-start] minmax(240px, 280px)
+        [right-end] minmax(24px, 1fr) [full-end];
+      grid-template-rows:
+        [pad-top] minmax(12px, auto)
+        [row-1] auto
+        [gap-r1] 16px
+        [row-2] auto
+        [gap-r2] 16px
+        [row-3] auto
+        [gap-r3] 28px
+        [row-4] auto
+        [gap-r4] 32px
+        [row-5] auto
+        [gap-r5] 24px
+        [row-6] auto
+        [gap-r6] 24px
+        [row-7] auto
+        [pad-bottom] minmax(24px, auto);
+      gap: 0;
+      padding: 0;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+  }
+</style>

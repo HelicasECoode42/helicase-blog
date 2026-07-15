@@ -1,0 +1,31 @@
+---
+// ============================================
+// HELICASE DESKTOP.OS — Dock
+// Bottom app bar with indicators for open windows.
+// ============================================
+export interface DockItem {
+  id: string
+  icon: string
+  label: string
+}
+
+interface Props {
+  items: DockItem[]
+}
+
+const { items } = Astro.props;
+---
+<nav class="os-dock" id="os-dock" aria-label="Application dock">
+  {items.map(item => (
+    <button
+      class="dock__item"
+      data-dock-id={item.id}
+      title={item.label}
+      aria-label={item.label}
+    >
+      <span class="dock__item__icon">{item.icon}</span>
+      <span class="dock__item__label">{item.label}</span>
+      <span class="dock__item__dot"></span>
+    </button>
+  ))}
+</nav>

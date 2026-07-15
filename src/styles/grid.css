@@ -1,0 +1,93 @@
+/* ============================================
+   HELICASE — Blueprint Grid Background
+   4-layer repeating-linear-gradient on <html>.
+   GPU-composited via background-attachment: fixed.
+   Small grid (20px) + large grid (100px).
+   ============================================ */
+
+html {
+  background-color: var(--color-canvas);
+
+  /* Layer 1 + 2: Small grid (20px, 0.5px lines) */
+  /* Layer 3 + 4: Large grid (100px, 1px lines — emphasized) */
+  background-image:
+    /* Small vertical */
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent calc(var(--grid-size-sm) - 0.5px),
+      color-mix(in srgb, var(--grid-color) calc(var(--grid-opacity) * 100%), transparent)
+        calc(var(--grid-size-sm) - 0.5px),
+      color-mix(in srgb, var(--grid-color) calc(var(--grid-opacity) * 100%), transparent)
+        var(--grid-size-sm)
+    ),
+    /* Small horizontal */
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent calc(var(--grid-size-sm) - 0.5px),
+      color-mix(in srgb, var(--grid-color) calc(var(--grid-opacity) * 100%), transparent)
+        calc(var(--grid-size-sm) - 0.5px),
+      color-mix(in srgb, var(--grid-color) calc(var(--grid-opacity) * 100%), transparent)
+        var(--grid-size-sm)
+    ),
+    /* Large vertical */
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent calc(var(--grid-size-lg) - 1px),
+      color-mix(in srgb, var(--grid-color) calc(var(--grid-opacity) * 50%), transparent)
+        calc(var(--grid-size-lg) - 1px),
+      color-mix(in srgb, var(--grid-color) calc(var(--grid-opacity) * 50%), transparent)
+        var(--grid-size-lg)
+    ),
+    /* Large horizontal */
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent calc(var(--grid-size-lg) - 1px),
+      color-mix(in srgb, var(--grid-color) calc(var(--grid-opacity) * 50%), transparent)
+        calc(var(--grid-size-lg) - 1px),
+      color-mix(in srgb, var(--grid-color) calc(var(--grid-opacity) * 50%), transparent)
+        var(--grid-size-lg)
+    );
+
+  background-size:
+    20px 20px,
+    20px 20px,
+    100px 100px,
+    100px 100px;
+
+  /* Fixed = composited once, zero scroll cost */
+  background-attachment: fixed;
+}
+
+/* Fallback for browsers without color-mix() */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  html {
+    --grid-color-rgb: 216, 219, 224;
+    background-image:
+      repeating-linear-gradient(90deg,
+        transparent, transparent calc(var(--grid-size-sm) - 0.5px),
+        rgba(var(--grid-color-rgb), 0.3) calc(var(--grid-size-sm) - 0.5px),
+        rgba(var(--grid-color-rgb), 0.3) var(--grid-size-sm)
+      ),
+      repeating-linear-gradient(0deg,
+        transparent, transparent calc(var(--grid-size-sm) - 0.5px),
+        rgba(var(--grid-color-rgb), 0.3) calc(var(--grid-size-sm) - 0.5px),
+        rgba(var(--grid-color-rgb), 0.3) var(--grid-size-sm)
+      ),
+      repeating-linear-gradient(90deg,
+        transparent, transparent calc(var(--grid-size-lg) - 1px),
+        rgba(var(--grid-color-rgb), 0.15) calc(var(--grid-size-lg) - 1px),
+        rgba(var(--grid-color-rgb), 0.15) var(--grid-size-lg)
+      ),
+      repeating-linear-gradient(0deg,
+        transparent, transparent calc(var(--grid-size-lg) - 1px),
+        rgba(var(--grid-color-rgb), 0.15) calc(var(--grid-size-lg) - 1px),
+        rgba(var(--grid-color-rgb), 0.15) var(--grid-size-lg)
+      );
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+    background-attachment: fixed;
+  }
+}

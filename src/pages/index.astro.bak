@@ -1,0 +1,97 @@
+---
+// ============================================
+// HELICASE — Canvas Homepage (/)
+// Stage 2: Profile + CORE + TimeRing + Articles + ConnectionLines
+// ============================================
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Canvas from '../components/Canvas.astro';
+import EntryLoading from '../components/EntryLoading.astro';
+import BackgroundDebris from '../components/BackgroundDebris.astro';
+import Profile from '../components/modules/Profile.astro';
+import Core from '../components/modules/Core.astro';
+import TimeRing from '../components/modules/TimeRing.astro';
+import ArticleCluster from '../components/modules/ArticleCluster.astro';
+import ConnectionLines from '../components/shared/ConnectionLines.astro';
+
+// Fetch latest posts per category
+const techPosts = (await getCollection('blog', ({ data }) =>
+  data.category === 'tech' && !data.draft
+)).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const dailyPosts = (await getCollection('blog', ({ data }) =>
+  data.category === 'daily' && !data.draft
+)).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+
+const reviewPosts = (await getCollection('blog', ({ data }) =>
+  data.category === 'reviews' && !data.draft
+)).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+---
+
+<BaseLayout title="Canvas" description="HelicasE — 一张无边线索画布，信息以几何秩序分布。">
+  <EntryLoading slot="entry-overlay" />
+  <BackgroundDebris />
+
+  <Canvas>
+    <!-- TOP LEFT: Profile -->
+    <div class="spot spot-profile"><Profile /></div>
+
+    <!-- CENTER: CORE ASCII -->
+    <div class="spot spot-core"><Core /></div>
+
+    <!-- TOP RIGHT: TimeRing -->
+    <div class="spot spot-timering"><TimeRing /></div>
+
+    <!-- MID LEFT: Tech Blog -->
+    <div class="spot spot-tech">
+      <ArticleCluster category="tech" label="TECH BLOG" posts={techPosts} />
+    </div>
+
+    <!-- MID RIGHT: Daily / Essay -->
+    <div class="spot spot-daily">
+      <ArticleCluster category="daily" label="DAILY / ESSAY" posts={dailyPosts} />
+    </div>
+
+    <!-- BOTTOM RIGHT: Reviews -->
+    <div class="spot spot-reviews">
+      <ArticleCluster category="reviews" label="REVIEWS" posts={reviewPosts} />
+    </div>
+
+    <!-- Connection lines overlay -->
+    <ConnectionLines />
+  </Canvas>
+</BaseLayout>
+
+<style>
+  .spot { min-width: 0; }
+
+  /* ── Full Canvas (1440px+) ─────────── */
+  @media (min-width: 1440px) {
+    .spot-profile  { grid-column: left-start / left-end;    grid-row: row-1; align-self: start; justify-self: start; }
+    .spot-core     { grid-column: center-start / center-end; grid-row: row-2; align-self: center; justify-self: center; }
+    .spot-timering { grid-column: right-start / right-end;   grid-row: row-1; align-self: start; justify-self: end; }
+    .spot-tech     { grid-column: left-start / left-end;    grid-row: row-3; align-self: start; }
+    .spot-daily    { grid-column: right-start / right-end;   grid-row: row-3; align-self: start; }
+    .spot-reviews  { grid-column: right-start / right-end;   grid-row: row-4; align-self: start; }
+  }
+
+  /* ── Compressed Desktop (1024-1439px) ── */
+  @media (min-width: 1024px) and (max-width: 1439px) {
+    .spot-profile  { grid-column: 2; grid-row: 2; }
+    .spot-core     { grid-column: 4; grid-row: 4; justify-self: center; }
+    .spot-timering { grid-column: 6; grid-row: 2; justify-self: end; }
+    .spot-tech     { grid-column: 2; grid-row: 6; }
+    .spot-daily    { grid-column: 4; grid-row: 6; }
+    .spot-reviews  { grid-column: 4; grid-row: 8; }
+  }
+
+  /* ── Tablet (768-1023px) ────────────── */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .spot-profile  { grid-column: 1; grid-row: 1; }
+    .spot-core     { grid-column: 1 / -1; grid-row: 2; justify-self: center; }
+    .spot-timering { grid-column: 2; grid-row: 1; justify-self: end; }
+    .spot-tech     { grid-column: 1; grid-row: 3; }
+    .spot-daily    { grid-column: 2; grid-row: 3; }
+    .spot-reviews  { grid-column: 2; grid-row: 4; }
+  }
+</style>

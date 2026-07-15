@@ -1,0 +1,10 @@
+{
+  "title": "HELICASE",
+  "description": "一张无边线索画布，信息以几何秩序分布。",
+  "author": "HelicasE",
+  "categories": [
+    { "key": "tech", "label": "TECH" },
+    { "key": "daily", "label": "DAILY" },
+    { "key": "reviews", "label": "REVIEWS" }
+  ]
+}

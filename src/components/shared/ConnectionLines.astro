@@ -1,0 +1,164 @@
+---
+// ============================================
+// HELICASE — ConnectionLines
+// SVG overlay that draws 1px silver lines
+// between related modules on the canvas.
+// Always visible: CORE ↔ Profile, TimeRing ↔ Heatmap.
+// Animated "tightening": dashed → solid on hover.
+// ============================================
+---
+
+<div class="connection-lines" id="connection-lines" aria-hidden="true">
+  <svg id="lines-svg" width="100%" height="100%"></svg>
+</div>
+
+<style>
+  .connection-lines {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  #lines-svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .conn-line {
+    fill: none;
+    stroke: var(--color-blue);
+    stroke-width: 1.5px;
+    stroke-linecap: round;
+    opacity: 0;
+    stroke-dasharray: 6 4; /* subtle dashed — like evidence thread */
+    transition:
+      opacity var(--duration-micro) var(--ease-mechanical),
+      stroke-dashoffset 0.2s var(--ease-mechanical);
+  }
+
+  /* Always-visible: steady visible line */
+  .conn-line--always {
+    opacity: 0.55;
+  }
+
+  /* Hover-reveal: appears on trigger */
+  .conn-line--hover {
+    stroke-dasharray: 4 8;
+    stroke-dashoffset: 24;
+  }
+
+  .conn-line--hover.active {
+    opacity: 0.55;
+    stroke-dashoffset: 0;
+  }
+
+  /* Tightened state (pulled taut) */
+  .conn-line--tight {
+    opacity: 0.55;
+    stroke-dasharray: none;
+  }
+</style>
+
+<script>
+  interface ConnDef {
+    from: string;     // CSS selector for source module
+    to: string;       // CSS selector for target module
+    mode: 'always' | 'hover';
+    trigger?: string; // CSS selector for hover trigger (mode='hover')
+  }
+
+  const LINES: ConnDef[] = [
+    { from: '[data-module="core"]', to: '[data-module="profile"]', mode: 'always' },
+    // TimeRing ↔ Heatmap will activate when heatmap is added in Stage 8
+  ];
+
+  class LineSystem {
+    private svg: SVGSVGElement;
+    private lines: Map<string, SVGPathElement> = new Map();
+    private observer: ResizeObserver;
+    private ticking = false;
+
+    constructor(svg: SVGSVGElement, defs: ConnDef[]) {
+      this.svg = svg;
+
+      // Create path elements
+      for (const def of defs) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.classList.add('conn-line');
+        if (def.mode === 'always') {
+          path.classList.add('conn-line--always');
+        } else {
+          path.classList.add('conn-line--hover');
+          path.dataset.trigger = def.trigger || '';
+        }
+        path.dataset.from = def.from;
+        path.dataset.to = def.to;
+        svg.appendChild(path);
+        this.lines.set(`${def.from}→${def.to}`, path);
+      }
+
+      // Draw on resize
+      this.observer = new ResizeObserver(() => this.scheduleDraw());
+      this.observer.observe(document.body);
+      this.scheduleDraw();
+
+      // Setup hover triggers
+      this.setupHoverTriggers(defs);
+    }
+
+    private scheduleDraw() {
+      if (this.ticking) return;
+      this.ticking = true;
+      requestAnimationFrame(() => {
+        this.draw();
+        this.ticking = false;
+      });
+    }
+
+    private draw() {
+      const canvasRect = this.svg.parentElement!.getBoundingClientRect();
+
+      for (const path of this.lines.values()) {
+        const fromEl = document.querySelector(path.dataset.from!);
+        const toEl = document.querySelector(path.dataset.to!);
+        if (!fromEl || !toEl) { path.setAttribute('d', ''); continue; }
+
+        const fr = fromEl.getBoundingClientRect();
+        const tr = toEl.getBoundingClientRect();
+
+        const x1 = fr.left + fr.width / 2 - canvasRect.left;
+        const y1 = fr.top + fr.height / 2 - canvasRect.top;
+        const x2 = tr.left + tr.width / 2 - canvasRect.left;
+        const y2 = tr.top + tr.height / 2 - canvasRect.top;
+
+        path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+      }
+    }
+
+    private setupHoverTriggers(defs: ConnDef[]) {
+      for (const def of defs) {
+        if (def.mode !== 'hover' || !def.trigger) continue;
+        const trigger = document.querySelector(def.trigger);
+        if (!trigger) continue;
+        const path = this.lines.get(`${def.from}→${def.to}`)!;
+
+        trigger.addEventListener('mouseenter', () => path.classList.add('active'));
+        trigger.addEventListener('mouseleave', () => path.classList.remove('active'));
+      }
+    }
+
+    destroy() {
+      this.observer.disconnect();
+    }
+  }
+
+  const svg = document.getElementById('lines-svg') as unknown as SVGSVGElement;
+  if (svg) {
+    const sys = new LineSystem(svg, LINES);
+    document.addEventListener('astro:before-swap', () => sys.destroy());
+  }
+</script>

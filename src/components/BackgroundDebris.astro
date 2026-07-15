@@ -1,0 +1,193 @@
+---
+// ============================================
+// HELICASE — Background ASCII Debris
+// dooo0t-style ambient texture: sparse ASCII
+// characters drifting slowly across the canvas.
+// Canvas-based, 60fps, GPU-composited.
+// ============================================
+---
+
+<canvas
+  id="debris-canvas"
+  class="debris-canvas"
+  aria-hidden="true"
+></canvas>
+
+<style>
+  .debris-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.9;
+  }
+</style>
+
+<script>
+  // ── Debris Characters ─────────────────
+  const CHARS = [
+    '.', '·', '*', '+', '×', '○', '·',
+    ':', ';', '\'', '"', '`', '~', '∘',
+    '▫', '◌', '▹', '░', '▒', '▓', '│',
+    '╱', '╲', '·', '∙', '∗', '⋅',
+  ];
+
+  // ── Particle System ──────────────────
+  interface Particle {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    char: string;
+    opacity: number;
+    targetOpacity: number;
+    opacitySpeed: number;
+    size: number;
+    color: string;
+  }
+
+  class DebrisField {
+    private canvas: HTMLCanvasElement;
+    private ctx: CanvasRenderingContext2D;
+    private particles: Particle[] = [];
+    private rafId = 0;
+    private isActive = true;
+    private dpr: number;
+
+    constructor(canvas: HTMLCanvasElement) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d')!;
+      this.dpr = window.devicePixelRatio || 1;
+
+      this.resize();
+      this.initParticles();
+      this.tick = this.tick.bind(this);
+
+      window.addEventListener('resize', () => this.resize());
+      this.rafId = requestAnimationFrame(this.tick);
+    }
+
+    private resize() {
+      this.dpr = window.devicePixelRatio || 1;
+      this.canvas.width = window.innerWidth * this.dpr;
+      this.canvas.height = window.innerHeight * this.dpr;
+      this.canvas.style.width = `${window.innerWidth}px`;
+      this.canvas.style.height = `${window.innerHeight}px`;
+      this.ctx.scale(this.dpr, this.dpr);
+    }
+
+    private initParticles() {
+      const count = Math.floor(
+        (window.innerWidth * window.innerHeight) / 12000
+      ); // ~108 on 1440x900 — denser for visibility
+      this.particles = [];
+
+      const colors = [
+        '160, 185, 215',    // light blue-gray (主色调)
+        '51, 78, 213',      // sky blue accent
+        '140, 170, 210',    // softer blue
+        '180, 200, 225',    // pale blue
+      ];
+      const weights = [0.40, 0.10, 0.30, 0.20]; // light-blue dominant
+
+      for (let i = 0; i < count; i++) {
+        // Weighted random color
+        const r = Math.random();
+        let colorIdx = 0;
+        let acc = 0;
+        for (let j = 0; j < weights.length; j++) {
+          acc += weights[j];
+          if (r <= acc) { colorIdx = j; break; }
+        }
+
+        this.particles.push({
+          x: Math.random() * window.innerWidth,
+          y: Math.random() * window.innerHeight,
+          vx: (Math.random() - 0.5) * 0.15,  // very slow drift
+          vy: (Math.random() - 0.5) * 0.15 - 0.05, // slight upward bias
+          char: CHARS[Math.floor(Math.random() * CHARS.length)],
+          opacity: 0,
+          targetOpacity: Math.random() * 0.12 + 0.04, // 0.04-0.16 — more visible
+          opacitySpeed: Math.random() * 0.004 + 0.002,
+          size: Math.random() > 0.8 ? 16 : 13, // most 13px, some 16px
+          color: colors[colorIdx],
+        });
+      }
+    }
+
+    private tick() {
+      if (!this.isActive) return;
+
+      const ctx = this.ctx;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+
+      for (const p of this.particles) {
+        // Drift
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Wrap around edges
+        if (p.x < -20) p.x = w + 20;
+        if (p.x > w + 20) p.x = -20;
+        if (p.y < -20) p.y = h + 20;
+        if (p.y > h + 20) p.y = -20;
+
+        // Slight random wobble in velocity
+        p.vx += (Math.random() - 0.5) * 0.002;
+        p.vy += (Math.random() - 0.5) * 0.002;
+        // Clamp speed
+        const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+        if (speed > 0.2) {
+          p.vx = (p.vx / speed) * 0.15;
+          p.vy = (p.vy / speed) * 0.15;
+        }
+
+        // Opacity breathing
+        if (p.opacity < p.targetOpacity) {
+          p.opacity = Math.min(p.targetOpacity, p.opacity + p.opacitySpeed);
+        } else {
+          // Randomly change target for breathing effect
+          if (Math.random() < 0.002) {
+            p.targetOpacity = Math.random() * 0.12 + 0.04;
+          }
+        }
+
+        // Draw
+        ctx.font = `${p.size}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = `rgba(${p.color}, ${p.opacity})`;
+        ctx.fillText(p.char, p.x, p.y);
+      }
+
+      this.rafId = requestAnimationFrame(this.tick);
+    }
+
+    destroy() {
+      this.isActive = false;
+      cancelAnimationFrame(this.rafId);
+      window.removeEventListener('resize', () => this.resize());
+    }
+  }
+
+  // ── Init ──────────────────────────────
+  const canvas = document.getElementById('debris-canvas') as HTMLCanvasElement;
+  if (canvas) {
+    const debris = new DebrisField(canvas);
+
+    // Pause when page not visible
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        debris['isActive'] = false;
+      } else {
+        debris['isActive'] = true;
+        debris['rafId'] = requestAnimationFrame(debris['tick']);
+      }
+    });
+  }
+</script>

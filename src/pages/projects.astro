@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import projects from '../data/projects';
+const publicProjects = projects.filter(p => p.visibility === 'public');
+---
+<BaseLayout title="Projects" description="技术项目、实验、作品与持续成长">
+  <main class="work-page">
+    <h1 class="sr-only">PROJECTS</h1>
+    <div class="project-list">
+      {publicProjects.map(project => (
+        <article class="project" id={project.id}>
+          <div class="project-head"><div><span class="status">{project.status}</span><h2>{project.name}</h2></div><strong>{project.progress}%</strong></div>
+          <p class="summary">{project.summary}</p>
+          <div class="meter" aria-label={`项目进度 ${project.progress}%`}><span style={`width:${project.progress}%`}></span></div>
+          <dl><div><dt>NOW</dt><dd>{project.current}</dd></div><div><dt>NEXT</dt><dd>{project.next}</dd></div></dl>
+          <div class="stack">{project.stack.map(item => <span>{item}</span>)}</div>
+          <time>updated {project.updatedAt}</time>
+        </article>
+      ))}
+    </div>
+  </main>
+</BaseLayout>
+<style>
+  .work-page{max-width:900px;margin:auto;padding:56px 24px 100px}.back{font:12px var(--font-mono);color:var(--color-silver)}header{margin:48px 0 36px}.eyebrow,.status,dt,time,.stack{font-family:var(--font-mono)}.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--color-blue);margin-bottom:10px}h1{font:700 1rem/1 var(--font-mono);letter-spacing:.2em;color:var(--color-deep-blue)}.project-list{display:grid;gap:28px}.project{border-top:1px solid var(--color-silver-light);padding-top:22px}.project-head{display:flex;justify-content:space-between;align-items:start}.project-head h2{font:600 1.7rem var(--font-body);margin-top:6px}.project-head strong{font:500 2.5rem var(--font-mono);color:var(--color-silver-light)}.status{font-size:10px;color:var(--color-blue);letter-spacing:.12em}.summary{max-width:650px;line-height:1.7;margin:18px 0}.meter{height:2px;background:var(--color-silver-light);margin:20px 0}.meter span{height:100%;display:block;background:var(--color-blue)}dl{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin:26px 0}dt{font-size:9px;letter-spacing:.15em;color:var(--color-silver)}dd{font-size:.9rem;line-height:1.6;margin-top:7px}.stack{display:flex;gap:8px;flex-wrap:wrap}.stack span{font-size:10px;border:1px solid var(--color-silver-light);padding:4px 7px}time{display:block;font-size:9px;color:var(--color-silver);margin-top:20px}@media(max-width:600px){dl{grid-template-columns:1fr}.work-page{padding:40px 16px 80px}}
+</style>
+<style>
+  .work-page{padding-top:34px}
+  @media(max-width:600px){.work-page{padding-top:28px}}
+</style>

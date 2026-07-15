@@ -1,0 +1,284 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="OC" description="HELICASE 空间的虚拟接待者">
+  <main class="oc">
+    <a href="/">← canvas</a>
+
+    <section>
+      <div class="portrait">
+        <img src="/images/oc/host-idle.gif" alt="HELICASE 的虚拟接待者" width="256" height="256" />
+      </div>
+
+      <div class="oc-dialog">
+        <span class="oc-tag">HOST_00 / PROTOTYPE</span>
+        <h1 class="oc-name">—</h1>
+
+        <!-- Conversation area -->
+        <div class="oc-chat" id="oc-chat">
+          <div class="oc-msg oc-msg--system">offline — 说点什么来唤醒 HOST_00</div>
+        </div>
+
+        <!-- Preset prompts -->
+        <div class="oc-prompts">
+          <button data-q="最近在做什么？">最近在做什么？</button>
+          <button data-q="推荐一篇文章">推荐一篇文章</button>
+          <button data-q="这里为什么叫 HELICASE？">为什么叫 HELICASE？</button>
+        </div>
+
+        <!-- Free-form input -->
+        <form class="oc-input" id="oc-form">
+          <input
+            type="text"
+            id="oc-text"
+            placeholder="问 HOST_00 任何问题…"
+            autocomplete="off"
+          />
+          <button type="submit" id="oc-send" aria-label="发送">→</button>
+        </form>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
+
+<script>
+  const chat = document.getElementById('oc-chat')!;
+  const form = document.getElementById('oc-form')! as HTMLFormElement;
+  const input = document.getElementById('oc-text')! as HTMLInputElement;
+  const sendBtn = document.getElementById('oc-send')! as HTMLButtonElement;
+
+  // Conversation history for context
+  const history: Array<{ role: string; content: string }> = [];
+  let busy = false;
+
+  function addMsg(text: string, who: 'user' | 'ai' | 'system') {
+    const div = document.createElement('div');
+    div.className = `oc-msg oc-msg--${who}`;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  async function askQuestion(question: string) {
+    if (busy || !question.trim()) return;
+    busy = true;
+    sendBtn.disabled = true;
+
+    // Clear system hint on first message
+    const sysHint = chat.querySelector('.oc-msg--system');
+    if (sysHint) sysHint.remove();
+
+    addMsg(question, 'user');
+    history.push({ role: 'user', content: question });
+
+    const loadingEl = addMsg('…', 'ai');
+
+    try {
+      const res = await fetch('/api/oc-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        loadingEl.textContent = data.error || '连接失败';
+        loadingEl.classList.add('oc-msg--error');
+      } else {
+        loadingEl.textContent = data.reply;
+        history.push({ role: 'assistant', content: data.reply });
+      }
+    } catch {
+      loadingEl.textContent = '网络错误，请稍后再试';
+      loadingEl.classList.add('oc-msg--error');
+    }
+
+    busy = false;
+    sendBtn.disabled = false;
+    input.value = '';
+    input.focus();
+  }
+
+  // Free-form input
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    askQuestion(input.value);
+  });
+
+  // Preset prompt buttons
+  document.querySelectorAll('.oc-prompts button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const q = (btn as HTMLButtonElement).dataset.q || '';
+      askQuestion(q);
+    });
+  });
+
+  // Enter to send (already handled by form submit, but just in case)
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+</script>
+
+<style>
+  .oc {
+    max-width: 900px;
+    margin: auto;
+    padding: 56px 24px 100px;
+  }
+  .oc > a {
+    font: 10px var(--font-mono);
+    color: var(--color-silver);
+  }
+
+  section {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 56px;
+    margin-top: 70px;
+  }
+
+  .portrait {
+    height: 360px;
+    border: 1px solid var(--color-silver-light);
+    display: grid;
+    place-items: center;
+    background:
+      linear-gradient(135deg, transparent 49.8%, var(--color-silver-light) 50%, transparent 50.2%),
+      url('/images/oc/host-idle.png') center/256px no-repeat;
+  }
+  .portrait img {
+    width: 256px;
+    height: 256px;
+    object-fit: contain;
+    image-rendering: auto;
+  }
+
+  .oc-tag {
+    font: 10px var(--font-mono);
+    letter-spacing: 0.15em;
+    color: var(--color-blue);
+  }
+  .oc-name {
+    font: 700 2.8rem var(--font-body);
+    color: var(--color-deep-blue);
+    margin: 14px 0;
+  }
+
+  /* ── Chat area ─────────────────── */
+  .oc-chat {
+    max-height: 320px;
+    overflow-y: auto;
+    margin: 20px 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-right: 8px;
+  }
+
+  .oc-msg {
+    font-size: 0.85rem;
+    line-height: 1.7;
+    padding: 10px 14px;
+    border-radius: 2px;
+    max-width: 85%;
+    word-break: break-word;
+  }
+  .oc-msg--user {
+    align-self: flex-end;
+    background: var(--color-deep-blue);
+    color: var(--color-white);
+    font-family: var(--font-body);
+  }
+  .oc-msg--ai {
+    align-self: flex-start;
+    border-left: 2px solid var(--color-blue);
+    background: rgba(51, 78, 213, 0.03);
+    font-family: var(--font-body);
+    color: var(--color-black);
+  }
+  .oc-msg--system {
+    align-self: center;
+    font: 0.75rem var(--font-mono);
+    color: var(--color-silver);
+    text-align: center;
+    padding: 16px 0;
+  }
+  .oc-msg--error {
+    border-left-color: #c0392b;
+    color: #c0392b;
+  }
+
+  /* ── Preset prompts ────────────── */
+  .oc-prompts {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .oc-prompts button {
+    background: none;
+    border: 1px solid var(--color-silver-light);
+    padding: 6px 10px;
+    font: 10px var(--font-mono);
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    transition: all 0.15s;
+  }
+  .oc-prompts button:hover {
+    border-color: var(--color-blue);
+    color: var(--color-blue);
+  }
+
+  /* ── Input bar ─────────────────── */
+  .oc-input {
+    display: flex;
+    border: 1px solid var(--color-silver-light);
+    transition: border-color 0.15s;
+  }
+  .oc-input:focus-within {
+    border-color: var(--color-blue);
+  }
+  .oc-input input {
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 10px 14px;
+    font: 0.85rem var(--font-body);
+    background: transparent;
+    color: var(--color-black);
+  }
+  .oc-input input::placeholder {
+    color: var(--color-silver);
+  }
+  .oc-input button {
+    border: none;
+    border-left: 1px solid var(--color-silver-light);
+    background: none;
+    padding: 0 16px;
+    font: 1rem var(--font-mono);
+    color: var(--color-silver);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .oc-input button:hover {
+    color: var(--color-blue);
+  }
+  .oc-input button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 650px) {
+    .oc { padding: 40px 16px; }
+    section {
+      grid-template-columns: 1fr;
+      margin-top: 40px;
+    }
+    .portrait { height: 240px; }
+  }
+</style>

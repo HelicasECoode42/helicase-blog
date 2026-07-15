@@ -1,0 +1,25 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import links from '../data/links';
+---
+
+<BaseLayout title="Links" description="友链">
+  <main class="links-page">
+    <a href="/">← canvas</a>
+    <h1>LINKS</h1>
+    <div class="links-list">
+      {links.map(link => (
+        <a href={link.url} target="_blank" rel="noopener noreferrer">
+          <strong>{link.name}</strong>
+          <span>{link.note}</span>
+          <em>↗</em>
+        </a>
+      ))}
+      {links.length === 0 && <p>—</p>}
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .links-page{max-width:720px;margin:0 auto;padding:64px 24px 120px}.links-page>a{font:10px var(--font-mono);color:var(--color-silver)}h1{font:700 1rem var(--font-mono);letter-spacing:.2em;color:var(--color-deep-blue);margin:44px 0 26px}.links-list>a{display:grid;grid-template-columns:160px 1fr auto;gap:20px;align-items:baseline;padding:15px 0;border-top:1px solid var(--color-silver-light)}.links-list strong{font:600 .78rem var(--font-mono)}.links-list span{font:.85rem var(--font-body);color:var(--color-text-secondary)}.links-list em{font-style:normal;color:var(--color-blue)}.links-list p{font:1rem var(--font-mono);color:var(--color-silver)}@media(max-width:600px){.links-page{padding:48px 16px 100px}.links-list>a{grid-template-columns:1fr auto}.links-list span{grid-column:1/-1}}
+</style>

@@ -1,0 +1,32 @@
+/* ============================================
+   HELICASE — Global Stylesheet
+   Imports all design system layers in dependency order.
+   This is the single CSS entry point loaded by BaseLayout.
+   ============================================ */
+
+/* Layer 1: Design tokens (custom properties) */
+@import './tokens.css';
+
+/* Layer 2: CSS reset (boundless enforcement) */
+@import './reset.css';
+
+/* Layer 3: Blueprint grid background */
+@import './grid.css';
+
+/* Layer 4: Typography (fonts + type scale) */
+@import './typography.css';
+
+/* Layer 5: Animation system */
+@import './animations.css';
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

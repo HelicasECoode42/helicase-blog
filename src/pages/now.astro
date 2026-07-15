@@ -1,0 +1,27 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import activities from '../data/activities';
+import projects from '../data/projects';
+import externalActivities from '../data/external-activities';
+const visible = [...activities.filter(a => a.visibility === 'public'), ...externalActivities].sort((a,b) => b.date.localeCompare(a.date));
+const counts = new Map<string, number>();
+visible.forEach(a => counts.set(a.date, (counts.get(a.date) || 0) + ('count' in a ? Math.max(1, Number(a.count)) : 1)));
+const today = new Date(); today.setHours(0,0,0,0);
+const start = new Date(today); start.setDate(today.getDate() - 364 - today.getDay());
+const days = Array.from({length: 371}, (_, i) => { const d = new Date(start); d.setDate(start.getDate()+i); const key=d.toISOString().slice(0,10); return {key,count:counts.get(key)||0}; });
+---
+<BaseLayout title="Now" description="最近在做什么、学习什么，以及真实的成长痕迹">
+  <main class="now-page">
+    <h1 class="sr-only">NOW</h1>
+    <section class="active"><h2>ACTIVE</h2>{projects.filter(p=>p.status==='active'&&p.visibility==='public').map(p=><a href={`/projects#${p.id}`}><strong>{p.name}</strong><span>{p.current}</span><em>next: {p.next}</em></a>)}</section>
+    <section class="heat"><div class="section-head"><h2>365 DAYS</h2><span>{visible.length} recorded activities</span></div><div class="heat-scroll"><div class="heat-grid" role="img" aria-label="过去一年的网站活动热力图">{days.map(d=><span class:list={['cell',`level-${Math.min(4,d.count)}`]} title={`${d.key}: ${d.count} activities`}></span>)}</div></div><div class="legend"><span>less</span>{[0,1,2,3,4].map(n=><i class={`level-${n}`}></i>)}<span>more</span></div></section>
+    <section class="timeline"><h2>RECENT LOG</h2>{visible.slice(0,12).map(item=><article><time>{item.date}</time><span class="type">{item.type}</span><p>{item.title}</p></article>)}</section>
+  </main>
+</BaseLayout>
+<style>
+  .now-page{max-width:960px;margin:auto;padding:56px 24px 100px}.back{font:12px var(--font-mono);color:var(--color-silver)}header{margin:48px 0 36px}header p,h2,.type,time,.section-head span,.legend{font-family:var(--font-mono)}header p{font-size:11px;letter-spacing:.18em;color:var(--color-blue)}h1{font:700 1rem/1 var(--font-mono);letter-spacing:.2em;color:var(--color-deep-blue);margin:10px 0}section{margin-top:54px}h2{font-size:10px;letter-spacing:.16em;color:var(--color-blue)}.active a{display:grid;grid-template-columns:150px 1fr 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--color-silver-light)}.active span,.active em{font-size:.82rem;line-height:1.5}.active em{color:var(--color-silver);font-style:normal}.section-head{display:flex;justify-content:space-between;margin-bottom:18px}.section-head span{font-size:10px;color:var(--color-silver)}.heat-scroll{overflow-x:auto;padding-bottom:8px}.heat-grid{display:grid;grid-template-rows:repeat(7,10px);grid-auto-flow:column;grid-auto-columns:10px;gap:3px;width:max-content}.cell,.legend i{background:#e7e9ee}.level-1{background:#b8c4fa!important}.level-2{background:#7d91ed!important}.level-3{background:#4e68dc!important}.level-4{background:#243fb9!important}.legend{display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:9px;color:var(--color-silver);margin-top:8px}.legend i{width:9px;height:9px}.timeline article{display:grid;grid-template-columns:100px 90px 1fr;gap:15px;padding:12px 0;border-bottom:1px solid var(--color-silver-light)}time,.type{font-size:10px;color:var(--color-silver)}.type{color:var(--color-blue)}.timeline p{font-size:.9rem}@media(max-width:600px){.now-page{padding:40px 16px}.active a{grid-template-columns:1fr}.timeline article{grid-template-columns:80px 1fr}.timeline p{grid-column:1/-1}}
+</style>
+<style>
+  .now-page{padding-top:34px}.active{margin-top:0}
+  @media(max-width:600px){.now-page{padding-top:28px}}
+</style>

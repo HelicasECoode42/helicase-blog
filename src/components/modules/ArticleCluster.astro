@@ -1,0 +1,114 @@
+---
+// ============================================
+// HELICASE — ArticleCluster Module
+// Canvas module showing article titles per category.
+// Click → fly to /blog/[slug] via View Transition.
+// Hover → dim other modules via hoverBus.
+// ============================================
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  category: string;
+  label: string;
+  posts: CollectionEntry<'blog'>[];
+}
+
+const { category, label, posts } = Astro.props;
+const visible = posts.slice(0, 4);
+---
+
+<div
+  class="cluster-module"
+  data-module={`articles-${category}`}
+  data-category={category}
+>
+  <!-- Category title (hover trigger for cross-module dimming) -->
+  <h3 class="cluster-title">{label}</h3>
+
+  <!-- Article list -->
+  <ul class="cluster-list">
+    {visible.length > 0 ? visible.map(post => (
+      <li class="cluster-item">
+        <a
+          href={`/blog/${post.id.replace(/\//g, '-')}`}
+          class="cluster-link"
+          style={`view-transition-name: post-${post.id.replace(/\//g, '-')}`}
+        >
+          <span class="cluster-item-title">{post.data.title}</span>
+          <time class="cluster-item-date">
+            {post.data.date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}
+          </time>
+        </a>
+      </li>
+    )) : <li class="cluster-empty">No public entries yet.</li>}
+  </ul>
+
+</div>
+
+<style>
+  .cluster-module {
+    font-family: var(--font-mono);
+    transition: opacity var(--duration-normal) var(--ease-mechanical);
+  }
+
+  .cluster-module + .cluster-module { margin-top: 44px; }
+
+  .cluster-title {
+    font: 600 0.7rem/1 var(--font-mono);
+    color: var(--color-blue);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    cursor: default;
+    transition: color var(--duration-micro) var(--ease-mechanical);
+  }
+
+  .cluster-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .cluster-empty {
+    min-height: 42px;
+    padding: 8px 0;
+    font: 400 0.68rem/1.5 var(--font-body);
+    color: var(--color-silver-light);
+  }
+
+  .cluster-link {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--color-black);
+    transition: color var(--duration-micro) var(--ease-mechanical);
+    padding: 2px 0;
+  }
+
+  .cluster-link:hover {
+    color: var(--color-blue);
+  }
+
+  .cluster-item-title {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .cluster-item-date {
+    font-size: 0.65rem;
+    color: var(--color-silver);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* ── Dimmed state (cross-module) ──── */
+  :global(.canvas-dimmed) {
+    opacity: 0.35;
+    transition: opacity var(--duration-normal) var(--ease-mechanical);
+  }
+
+</style>

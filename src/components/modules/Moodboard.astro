@@ -1,0 +1,188 @@
+---
+// ============================================
+// HELICASE — Moodboard
+// Pinterest-style masonry image wall.
+// Images stored in localStorage. Click → lightbox.
+// ============================================
+---
+
+<div class="mb-module" data-module="moodboard" id="mb-module">
+  <h3 class="mb-title">MOOD</h3>
+  <div class="mb-grid" id="mb-grid"></div>
+  <div class="mb-add" id="mb-add-area">
+    <button class="mb-add-btn" id="mb-add-btn">+ add image</button>
+    <div class="mb-add-form" id="mb-add-form" style="display:none">
+      <input type="text" id="mb-add-url" class="mb-add-input" placeholder="https://..." />
+      <button id="mb-add-save" class="mb-add-save">save</button>
+      <button id="mb-add-cancel" class="mb-add-cancel">×</button>
+    </div>
+  </div>
+</div>
+
+<style is:global>
+  .mb-module {
+    font-family: var(--font-mono);
+    width: 170px;
+  }
+
+  .mb-title {
+    font: 600 0.7rem/1 var(--font-mono);
+    color: var(--color-blue);
+    letter-spacing: 0.15em;
+    margin-bottom: 8px;
+  }
+
+  .mb-grid {
+    columns: 2;
+    column-gap: 6px;
+  }
+
+  .mb-img {
+    break-inside: avoid;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: opacity var(--duration-micro);
+    position: relative;
+  }
+
+  .mb-img img {
+    width: 100%;
+    display: block;
+  }
+
+  .mb-img:hover { opacity: 0.8; }
+
+  .mb-img-del {
+    position: absolute; top: 2px; right: 2px;
+    width: 16px; height: 16px;
+    background: rgba(15,17,23,0.5);
+    color: var(--color-white);
+    font-size: 0.6rem;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; cursor: pointer;
+    transition: opacity var(--duration-micro);
+    border: none;
+  }
+
+  .mb-img:hover .mb-img-del { opacity: 1; }
+
+  /* ── Add ──────────────────────────── */
+  .mb-add { margin-top: 8px; }
+
+  .mb-add-btn {
+    font: 400 0.6rem/1 var(--font-mono);
+    color: var(--color-silver-light);
+    background: none; border: none; cursor: pointer;
+    padding: 0; letter-spacing: 0.05em;
+    transition: color var(--duration-micro);
+  }
+
+  .mb-add-btn:hover { color: var(--color-blue); }
+
+  .mb-add-form {
+    display: flex; gap: 4px; margin-top: 4px;
+  }
+
+  .mb-add-input {
+    flex: 1;
+    font: 400 0.6rem/1 var(--font-mono);
+    border: 0.5px solid var(--color-silver-light);
+    padding: 3px 6px;
+    background: rgba(255,255,255,0.5);
+    outline: none;
+    color: var(--color-black);
+  }
+
+  .mb-add-input:focus { border-color: var(--color-blue); }
+
+  .mb-add-save, .mb-add-cancel {
+    font: 400 0.6rem/1 var(--font-mono);
+    background: none; border: 0.5px solid var(--color-silver-light);
+    padding: 3px 8px; cursor: pointer;
+    color: var(--color-silver);
+    transition: all var(--duration-micro);
+  }
+
+  .mb-add-save:hover { border-color: var(--color-blue); color: var(--color-blue); }
+  .mb-add-cancel:hover { color: var(--color-black); }
+
+  @media (max-width: 767px) {
+    .mb-module { width: 100%; }
+    .mb-grid { columns: 3; }
+  }
+</style>
+
+<script>
+  const STORE = 'helicase-moodboard';
+  const grid  = document.getElementById('mb-grid')!;
+  const addBtn = document.getElementById('mb-add-btn')!;
+  const addForm = document.getElementById('mb-add-form')!;
+  const addUrl = document.getElementById('mb-add-url') as HTMLInputElement;
+  const addSave = document.getElementById('mb-add-save')!;
+  const addCancel = document.getElementById('mb-add-cancel')!;
+
+  function load(): string[] {
+    try { const r = localStorage.getItem(STORE); return r ? JSON.parse(r) : []; }
+    catch { return []; }
+  }
+  function save(urls: string[]) { localStorage.setItem(STORE, JSON.stringify(urls)); }
+
+  function render() {
+    const urls = load();
+    if (!urls.length) {
+      grid.innerHTML = '<span style="font-size:0.6rem;color:var(--color-silver-light);letter-spacing:0.05em">no images</span>';
+      return;
+    }
+    grid.innerHTML = urls.map((url, i) => `
+      <div class="mb-img">
+        <img src="${url.replace(/"/g,'&quot;')}" alt="" loading="lazy" />
+        <button class="mb-img-del" data-idx="${i}">×</button>
+      </div>
+    `).join('');
+
+    grid.querySelectorAll('.mb-img-del').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt((btn as HTMLElement).dataset.idx!);
+        const urls = load();
+        urls.splice(idx, 1);
+        save(urls);
+        render();
+      });
+    });
+  }
+
+  addBtn.addEventListener('click', () => {
+    addBtn.style.display = 'none';
+    addForm.style.display = 'flex';
+    addUrl.focus();
+  });
+
+  function closeAdd() {
+    addForm.style.display = 'none';
+    addBtn.style.display = 'block';
+    addUrl.value = '';
+  }
+
+  addSave.addEventListener('click', () => {
+    const url = addUrl.value.trim();
+    if (url) {
+      const urls = load();
+      urls.push(url);
+      save(urls);
+      render();
+    }
+    closeAdd();
+  });
+
+  addCancel.addEventListener('click', closeAdd);
+  addUrl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addSave.click();
+    if (e.key === 'Escape') closeAdd();
+  });
+
+  render();
+  document.addEventListener('astro:after-swap', () => {
+    if (document.getElementById('mb-grid')) render();
+  });
+</script>

@@ -1,0 +1,26 @@
+---
+// ============================================
+// HELICASE DESKTOP.OS — Finder Content
+// File browser window listing articles by category.
+// ============================================
+export interface Props {
+  title: string
+  icon: string
+  items: { name: string; kind: string; href: string; date: string }[]
+}
+
+const { title, icon, items } = Astro.props;
+---
+<div class="finder" id={`finder-${title.toLowerCase()}`}>
+  <div class="finder__header">{title} — {items.length} items</div>
+  {items.map(item => (
+    <div class="finder__item" data-href={item.href} tabindex="0" role="link">
+      <span class="finder__item-icon">{icon}</span>
+      <div class="finder__item-info">
+        <span class="finder__item-name">{item.name}</span>
+        <span class="finder__item-meta">{item.kind} · {item.date}</span>
+      </div>
+      <span class="finder__item-arrow">→</span>
+    </div>
+  ))}
+</div>

@@ -1,0 +1,52 @@
+/* ============================================
+   HELICASE — Typography
+   Fontsource self-hosted fonts.
+   Fixed type scale on 4px grid increments.
+   Chinese via Noto Sans SC (unicode-range subset).
+   ============================================ */
+
+/* ── Fonts loaded via BaseLayout.astro (Astro frontmatter imports) ── */
+
+/* ── Base Typography ────────────────────── */
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font: var(--text-body);
+  color: var(--color-text);
+}
+
+/* ── Headings ───────────────────────────── */
+h1, .h1 { font: var(--text-h1); color: var(--color-deep-blue); letter-spacing: -0.02em; }
+h2, .h2 { font: var(--text-h2); color: var(--color-deep-blue); letter-spacing: -0.01em; }
+h3, .h3 { font: var(--text-h3); color: var(--color-black); }
+
+/* ── Utility Classes ────────────────────── */
+.text-body    { font: var(--text-body); }
+.text-caption { font: var(--text-caption); color: var(--color-text-secondary); }
+.text-micro   { font: var(--text-micro); color: var(--color-silver); }
+.text-mono    { font: var(--text-mono); }
+.text-silver  { color: var(--color-silver); }
+.text-blue     { color: var(--color-blue); }
+
+/* ── Code ────────────────────────────────── */
+pre {
+  font: var(--text-mono);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+
+/* ── Selection ──────────────────────────── */
+::selection {
+  background: var(--color-blue);
+  color: var(--color-white);
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "helicase",
+    "name": "HELICASE",
+    "type": "personal product",
+    "status": "active",
+    "progress": 58,
+    "summary": "个人数字展厅与本地创作工作台，连接技术、审美、兴趣与成长记录。",
+    "current": "建设 Studio、项目系统与公开成长页面",
+    "next": "完成 Quick Capture 与发布队列闭环",
+    "stack": ["Astro", "TypeScript", "Cloudflare Pages"],
+    "updatedAt": "2026-07-11",
+    "visibility": "public",
+    "links": [{ "label": "website", "url": "/" }]
+  }
+]

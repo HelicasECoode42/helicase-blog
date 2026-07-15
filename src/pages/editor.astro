@@ -1,0 +1,807 @@
+---
+// ============================================
+// HELICASE — Markdown Editor (/editor)
+// Browser-based writing environment.
+// Split-pane: editor + live preview.
+// Frontmatter form, toolbar, export/download.
+// ============================================
+import BaseLayout from '../layouts/BaseLayout.astro';
+import siteConfig from '../data/site-config.json';
+
+const categories = siteConfig.categories;
+---
+
+<BaseLayout title="Editor" description="Markdown 写作环境" noindex>
+  <div class="editor-page">
+    <!-- ── Top Bar ─────────────────────── -->
+    <div class="editor-topbar">
+      <div class="editor-topbar-left">
+        <a href="/studio" class="editor-back">← studio</a>
+        <span class="editor-divider-v"></span>
+        <span class="editor-title-label">EDITOR</span>
+      </div>
+      <div class="editor-topbar-right">
+        <button class="editor-btn editor-btn-ghost" id="btn-clear" title="New post">new</button>
+        <button class="editor-btn editor-btn-primary" id="btn-export" title="Download .md file">export ↓</button>
+      </div>
+    </div>
+
+    <!-- ── Frontmatter Form ────────────── -->
+    <details class="fm-details" id="fm-details">
+      <summary class="fm-summary">
+        <span class="fm-summary-label">FRONTMATTER</span>
+        <span class="fm-summary-status" id="fm-status">incomplete</span>
+      </summary>
+      <div class="fm-grid">
+        <div class="fm-field">
+          <label class="fm-label" for="fm-title">title</label>
+          <input type="text" id="fm-title" class="fm-input" placeholder="Article title" maxlength="120" />
+        </div>
+        <div class="fm-field">
+          <label class="fm-label" for="fm-date">date</label>
+          <input type="date" id="fm-date" class="fm-input" />
+        </div>
+        <div class="fm-field">
+          <label class="fm-label" for="fm-category">category</label>
+          <select id="fm-category" class="fm-input">
+            {categories.map(cat => (
+              <option value={cat.key}>{cat.label}</option>
+            ))}
+          </select>
+        </div>
+        <div class="fm-field">
+          <label class="fm-label" for="fm-tags">tags</label>
+          <input type="text" id="fm-tags" class="fm-input" placeholder="tag1, tag2, tag3" />
+        </div>
+        <div class="fm-field fm-field-wide">
+          <label class="fm-label" for="fm-summary">summary</label>
+          <textarea id="fm-summary" class="fm-textarea" placeholder="Brief summary (max 300 chars)" maxlength="300" rows="2"></textarea>
+        </div>
+        <div class="fm-field">
+          <label class="fm-label">
+            <input type="checkbox" id="fm-draft" class="fm-checkbox" checked />
+            draft
+          </label>
+        </div>
+      </div>
+    </details>
+
+    <!-- ── Toolbar ─────────────────────── -->
+    <div class="editor-toolbar" id="editor-toolbar">
+      <button class="tb-btn" data-action="h2" title="Heading">H</button>
+      <button class="tb-btn" data-action="bold" title="Bold"><strong>B</strong></button>
+      <button class="tb-btn" data-action="italic" title="Italic"><em>I</em></button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" data-action="link" title="Link">🔗</button>
+      <button class="tb-btn" data-action="image" title="Image">🖼</button>
+      <button class="tb-btn" data-action="code" title="Code block">{ }</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" data-action="ul" title="Bullet list">•</button>
+      <button class="tb-btn" data-action="ol" title="Numbered list">1.</button>
+      <button class="tb-btn" data-action="quote" title="Blockquote">"</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" data-action="hr" title="Divider">—</button>
+    </div>
+
+    <!-- ── Split Pane ──────────────────── -->
+    <div class="editor-split">
+      <div class="editor-pane editor-pane-edit">
+        <textarea
+          id="md-editor"
+          class="md-editor"
+          placeholder="Start writing in Markdown..."
+          spellcheck="false"
+        ></textarea>
+      </div>
+      <div class="editor-pane editor-pane-preview">
+        <div class="md-preview" id="md-preview">
+          <p class="preview-placeholder">Preview will appear here...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Status Bar ──────────────────── -->
+    <div class="editor-statusbar">
+      <span class="sb-item" id="sb-words">0 words</span>
+      <span class="sb-sep">·</span>
+      <span class="sb-item" id="sb-chars">0 chars</span>
+      <span class="sb-sep">·</span>
+      <span class="sb-item" id="sb-lines">0 lines</span>
+      <span class="sb-sep">·</span>
+      <span class="sb-item sb-save-status" id="sb-save">saved</span>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .editor-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: calc(100vh - 36px);
+  }
+
+  /* ── Top Bar ─────────────────────────── */
+  .editor-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 0.5px solid var(--color-silver-light);
+  }
+
+  .editor-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .editor-back {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--color-silver);
+    letter-spacing: 0.08em;
+    transition: color var(--duration-micro);
+  }
+  .editor-back:hover { color: var(--color-blue); }
+
+  .editor-divider-v {
+    width: 1px;
+    height: 14px;
+    background: var(--color-silver-light);
+  }
+
+  .editor-title-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--color-blue);
+    letter-spacing: 0.15em;
+  }
+
+  .editor-topbar-right {
+    display: flex;
+    gap: 8px;
+  }
+
+  .editor-btn {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    padding: 5px 14px;
+    border: 0.5px solid var(--color-silver-light);
+    cursor: pointer;
+    transition: all var(--duration-micro);
+    background: transparent;
+    color: var(--color-black);
+  }
+
+  .editor-btn-ghost:hover {
+    border-color: var(--color-silver);
+    color: var(--color-blue);
+  }
+
+  .editor-btn-primary {
+    background: var(--color-blue);
+    color: var(--color-white);
+    border-color: var(--color-blue);
+  }
+  .editor-btn-primary:hover {
+    background: var(--color-deep-blue);
+    border-color: var(--color-deep-blue);
+  }
+
+  /* ── Frontmatter ─────────────────────── */
+  .fm-details {
+    border-bottom: 0.5px solid var(--color-silver-light);
+  }
+
+  .fm-summary {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--color-silver);
+    letter-spacing: 0.1em;
+    padding: 10px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    list-style: none;
+    user-select: none;
+  }
+  .fm-summary::-webkit-details-marker { display: none; }
+  .fm-summary::before {
+    content: '▸';
+    font-size: 0.6rem;
+    transition: transform var(--duration-micro);
+  }
+  .fm-details[open] .fm-summary::before {
+    transform: rotate(90deg);
+  }
+
+  .fm-summary-label {
+    font-weight: 600;
+    color: var(--color-blue);
+    letter-spacing: 0.15em;
+  }
+
+  .fm-summary-status {
+    font-size: 0.55rem;
+    color: var(--color-silver-light);
+    padding: 1px 6px;
+    border: 0.5px solid var(--color-silver-light);
+    border-radius: 2px;
+  }
+  .fm-summary-status.complete {
+    color: var(--color-blue);
+    border-color: var(--color-blue);
+  }
+
+  .fm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    padding: 8px 0 16px;
+  }
+
+  .fm-field-wide {
+    grid-column: 1 / -1;
+  }
+
+  .fm-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--color-silver);
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+    text-transform: lowercase;
+  }
+
+  .fm-input, .fm-textarea {
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    border: 0.5px solid var(--color-silver-light);
+    background: var(--color-canvas);
+    color: var(--color-black);
+    outline: none;
+    transition: border-color var(--duration-micro);
+    box-sizing: border-box;
+  }
+  .fm-input:focus, .fm-textarea:focus {
+    border-color: var(--color-blue);
+  }
+
+  .fm-textarea {
+    resize: vertical;
+    min-height: 40px;
+  }
+
+  .fm-checkbox {
+    accent-color: var(--color-blue);
+  }
+
+  /* ── Toolbar ─────────────────────────── */
+  .editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 0;
+    border-bottom: 0.5px solid var(--color-silver-light);
+  }
+
+  .tb-btn {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 0.5px solid transparent;
+    cursor: pointer;
+    color: var(--color-silver);
+    transition: all var(--duration-micro);
+  }
+  .tb-btn:hover {
+    color: var(--color-blue);
+    border-color: var(--color-silver-light);
+    background: rgba(51,78,213,0.04);
+  }
+
+  .tb-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--color-silver-light);
+    margin: 0 6px;
+  }
+
+  /* ── Split Pane ──────────────────────── */
+  .editor-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex: 1;
+    min-height: 500px;
+    border-bottom: 0.5px solid var(--color-silver-light);
+  }
+
+  .editor-pane {
+    overflow: auto;
+  }
+
+  .editor-pane-edit {
+    border-right: 0.5px solid var(--color-silver-light);
+  }
+
+  .md-editor {
+    width: 100%;
+    height: 100%;
+    min-height: 500px;
+    padding: 20px 24px;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--color-black);
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    box-sizing: border-box;
+    tab-size: 2;
+  }
+
+  .md-editor::placeholder {
+    color: var(--color-silver-light);
+  }
+
+  /* ── Preview (shares article-body styles) ── */
+  .md-preview {
+    padding: 20px 24px;
+    font-family: var(--font-body);
+    font-size: 1rem;
+    line-height: 1.8;
+    color: var(--color-black);
+    min-height: 500px;
+  }
+
+  .preview-placeholder {
+    color: var(--color-silver-light);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  /* Preview typography — mirrors article-body */
+  .md-preview :global(h1) {
+    font: 700 2.5rem/1.15 var(--font-body);
+    color: var(--color-deep-blue);
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+  .md-preview :global(h2) {
+    font: 700 1.75rem/1.2 var(--font-body);
+    color: var(--color-deep-blue);
+    margin-top: 48px;
+    margin-bottom: 12px;
+  }
+  .md-preview :global(h3) {
+    font: 600 1.25rem/1.3 var(--font-body);
+    color: var(--color-deep-blue);
+    margin-top: 32px;
+    margin-bottom: 8px;
+  }
+  .md-preview :global(p) { margin-bottom: 16px; }
+  .md-preview :global(ul), .md-preview :global(ol) {
+    margin-bottom: 16px;
+    padding-left: 20px;
+  }
+  .md-preview :global(li) {
+    margin-bottom: 6px;
+    list-style-type: '— ';
+  }
+  .md-preview :global(pre) {
+    background: var(--color-black);
+    color: var(--color-silver-light);
+    padding: 20px 24px;
+    margin: 20px 0;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    font-family: var(--font-mono);
+  }
+  .md-preview :global(code) {
+    font-family: var(--font-mono);
+  }
+  .md-preview :global(p > code) {
+    background: var(--color-silver-light);
+    padding: 2px 6px;
+    font-size: 0.85em;
+  }
+  .md-preview :global(blockquote) {
+    border-left: 2px solid var(--color-blue);
+    padding-left: 16px;
+    margin: 20px 0;
+    color: var(--color-text-secondary);
+    font-style: italic;
+  }
+  .md-preview :global(hr) {
+    border: none;
+    border-top: var(--line-width) solid var(--color-silver-light);
+    margin: 40px 0;
+  }
+  .md-preview :global(a) {
+    color: var(--color-blue);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .md-preview :global(img) {
+    max-width: 100%;
+    height: auto;
+    margin: 16px 0;
+  }
+
+  /* ── Status Bar ──────────────────────── */
+  .editor-statusbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--color-silver);
+    letter-spacing: 0.05em;
+  }
+
+  .sb-sep {
+    color: var(--color-silver-light);
+  }
+
+  .sb-save-status {
+    transition: color var(--duration-micro);
+  }
+  .sb-save-status.saving {
+    color: var(--color-blue);
+  }
+
+  /* ── Responsive ──────────────────────── */
+  @media (max-width: 767px) {
+    .editor-page { padding: 0 12px 40px; }
+
+    .editor-split {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    .editor-pane-edit {
+      border-right: none;
+      border-bottom: 0.5px solid var(--color-silver-light);
+    }
+
+    .fm-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .md-editor, .md-preview {
+      min-height: 250px;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .fm-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+
+<script>
+  // @ts-nocheck -- legacy DOM-only editor; runtime behavior is covered by browser workflow tests.
+  import { marked } from 'marked';
+  // ── Markdown Editor Logic ──────────────
+  const STORAGE_KEY = 'helicase-editor-draft';
+  const SAVE_DELAY = 800;
+
+  // DOM refs
+  const editor = document.getElementById('md-editor');
+  const preview = document.getElementById('md-preview');
+  const fmTitle = document.getElementById('fm-title');
+  const fmDate = document.getElementById('fm-date');
+  const fmCategory = document.getElementById('fm-category');
+  const fmTags = document.getElementById('fm-tags');
+  const fmSummary = document.getElementById('fm-summary');
+  const fmDraft = document.getElementById('fm-draft');
+  const fmStatus = document.getElementById('fm-status');
+  const sbWords = document.getElementById('sb-words');
+  const sbChars = document.getElementById('sb-chars');
+  const sbLines = document.getElementById('sb-lines');
+  const sbSave = document.getElementById('sb-save');
+  const btnExport = document.getElementById('btn-export');
+  const btnClear = document.getElementById('btn-clear');
+
+  // Set default date to today
+  if (!fmDate.value) {
+    fmDate.value = new Date().toISOString().split('T')[0];
+  }
+
+  // ── Load draft ────────────────────────
+  function loadDraft() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  }
+
+  function saveDraft() {
+    const draft = {
+      title: fmTitle.value,
+      date: fmDate.value,
+      category: fmCategory.value,
+      tags: fmTags.value,
+      summary: fmSummary.value,
+      draft: fmDraft.checked,
+      body: editor.value,
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    sbSave.textContent = 'saved';
+    sbSave.classList.remove('saving');
+  }
+
+  // Debounced save
+  let saveTimer = null;
+  function scheduleSave() {
+    sbSave.textContent = 'saving...';
+    sbSave.classList.add('saving');
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveDraft, SAVE_DELAY);
+  }
+
+  // Restore draft
+  const draft = loadDraft();
+  if (draft) {
+    fmTitle.value = draft.title || '';
+    fmDate.value = draft.date || new Date().toISOString().split('T')[0];
+    fmCategory.value = draft.category || 'tech';
+    fmTags.value = draft.tags || '';
+    fmSummary.value = draft.summary || '';
+    fmDraft.checked = draft.draft !== false;
+    editor.value = draft.body || '';
+  }
+
+  // ── Preview rendering ─────────────────
+  function renderPreview() {
+    const md = editor.value;
+    if (!md.trim()) {
+      preview.innerHTML = '<p class="preview-placeholder">Preview will appear here...</p>';
+      return;
+    }
+    if (typeof marked !== 'undefined') {
+      marked.setOptions({ breaks: true, gfm: true });
+      preview.replaceChildren(sanitizePreview(marked.parse(md)));
+    }
+  }
+
+  // Markdown preview is untrusted HTML. Keep formatting, remove executable content.
+  function sanitizePreview(html) {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const blocked = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'FORM', 'INPUT', 'BUTTON', 'META', 'LINK']);
+    const urlAttrs = new Set(['href', 'src']);
+    const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
+    const elements = [];
+    while (walker.nextNode()) elements.push(walker.currentNode);
+    for (const el of elements) {
+      if (blocked.has(el.tagName)) { el.remove(); continue; }
+      for (const attr of [...el.attributes]) {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith('on') || name === 'style' || name === 'srcdoc') el.removeAttribute(attr.name);
+        if (urlAttrs.has(name) && !isSafeUrl(attr.value)) el.removeAttribute(attr.name);
+      }
+      if (el.tagName === 'A') {
+        el.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+    return template.content;
+  }
+
+  function isSafeUrl(value) {
+    const normalized = value.trim().replace(/[\u0000-\u001f\u007f\s]+/g, '');
+    if (!normalized || normalized.startsWith('#') || normalized.startsWith('/') || normalized.startsWith('./') || normalized.startsWith('../')) return true;
+    try {
+      const protocol = new URL(normalized, window.location.origin).protocol;
+      return ['http:', 'https:', 'mailto:'].includes(protocol);
+    } catch { return false; }
+  }
+
+  // ── Stats ─────────────────────────────
+  function updateStats() {
+    const text = editor.value;
+    const chars = text.length;
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const lines = text.split('\n').length;
+    sbWords.textContent = words + ' words';
+    sbChars.textContent = chars + ' chars';
+    sbLines.textContent = lines + ' lines';
+  }
+
+  // ── Frontmatter status ────────────────
+  function updateFmStatus() {
+    const hasTitle = fmTitle.value.trim().length > 0;
+    const hasDate = fmDate.value.length > 0;
+    const hasSummary = fmSummary.value.trim().length > 0;
+    if (hasTitle && hasDate && hasSummary) {
+      fmStatus.textContent = 'complete';
+      fmStatus.classList.add('complete');
+    } else {
+      fmStatus.textContent = 'incomplete';
+      fmStatus.classList.remove('complete');
+    }
+  }
+
+  // ── Event listeners ───────────────────
+  editor.addEventListener('input', function() {
+    renderPreview();
+    updateStats();
+    scheduleSave();
+  });
+
+  [fmTitle, fmDate, fmTags, fmSummary].forEach(function(el) {
+    el.addEventListener('input', function() {
+      updateFmStatus();
+      scheduleSave();
+    });
+  });
+  fmCategory.addEventListener('change', function() { scheduleSave(); updateFmStatus(); });
+  fmDraft.addEventListener('change', function() { scheduleSave(); });
+
+  // ── Toolbar actions ───────────────────
+  function insertAround(before, after) {
+    var start = editor.selectionStart;
+    var end = editor.selectionEnd;
+    var selected = editor.value.substring(start, end);
+    var replacement = before + (selected || 'text') + after;
+    editor.setRangeText(replacement, start, end, 'select');
+    editor.focus();
+    editor.dispatchEvent(new Event('input'));
+  }
+
+  function insertAtLineStart(prefix) {
+    var start = editor.selectionStart;
+    var lineStart = editor.value.lastIndexOf('\n', start - 1) + 1;
+    editor.setRangeText(prefix, lineStart, lineStart, 'end');
+    editor.focus();
+    editor.dispatchEvent(new Event('input'));
+  }
+
+  function insertBlock(text) {
+    var start = editor.selectionStart;
+    editor.setRangeText('\n' + text + '\n', start, start, 'end');
+    editor.focus();
+    editor.dispatchEvent(new Event('input'));
+  }
+
+  document.getElementById('editor-toolbar').addEventListener('click', function(e) {
+    var btn = e.target.closest('.tb-btn');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    switch (action) {
+      case 'h2': insertAtLineStart('## '); break;
+      case 'bold': insertAround('**', '**'); break;
+      case 'italic': insertAround('*', '*'); break;
+      case 'link': insertAround('[', '](url)'); break;
+      case 'image': insertBlock('![alt](image-url)'); break;
+      case 'code': insertBlock('\`\`\`\ncode\n\`\`\`'); break;
+      case 'ul': insertAtLineStart('- '); break;
+      case 'ol': insertAtLineStart('1. '); break;
+      case 'quote': insertAtLineStart('> '); break;
+      case 'hr': insertBlock('---'); break;
+    }
+  });
+
+  // ── Tab key support ───────────────────
+  editor.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      var start = editor.selectionStart;
+      editor.setRangeText('  ', start, start, 'end');
+      editor.dispatchEvent(new Event('input'));
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      saveDraft();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      btnExport.click();
+    }
+    if ((e.metaKey || e.ctrlKey) && ['b', 'i', 'k'].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+      const key = e.key.toLowerCase();
+      if (key === 'b') insertAround('**', '**');
+      if (key === 'i') insertAround('*', '*');
+      if (key === 'k') insertAround('[', '](url)');
+    }
+  });
+
+  // ── Export ────────────────────────────
+  btnExport.addEventListener('click', function() {
+    var title = fmTitle.value.trim();
+    var date = fmDate.value || new Date().toISOString().split('T')[0];
+    var category = fmCategory.value;
+    var tagsRaw = fmTags.value.trim();
+    var summary = fmSummary.value.trim();
+    var isDraft = fmDraft.checked;
+    var body = editor.value;
+
+    if (!title || !summary || !body.trim()) {
+      document.getElementById('fm-details').open = true;
+      fmStatus.textContent = 'title, summary and body required';
+      fmStatus.classList.remove('complete');
+      return;
+    }
+
+    var tags = tagsRaw
+      ? '[' + tagsRaw.split(',').map(function(t) { return t.trim(); }).filter(Boolean).map(function(t) { return '"' + t + '"'; }).join(', ') + ']'
+      : '[]';
+
+    var fmLines = [
+      '---',
+      'title: "' + title.replace(/"/g, '\\"') + '"',
+      'date: ' + date,
+      'category: ' + category,
+      'tags: ' + tags,
+      'summary: "' + summary.replace(/"/g, '\\"') + '"',
+    ];
+    if (isDraft) fmLines.push('draft: true');
+    fmLines.push('---');
+    fmLines.push('');
+
+    var content = fmLines.join('\n') + body;
+    var blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+
+    var slug = title.toLowerCase()
+      .normalize('NFKC')
+      .replace(/[^\p{Letter}\p{Number}\s-]/gu, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 50);
+    var filename = date + '-' + slug + '.md';
+
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // ── Clear / New Post ──────────────────
+  btnClear.addEventListener('click', function() {
+    if (editor.value.trim() && !confirm('Discard current draft and start fresh?')) return;
+    fmTitle.value = '';
+    fmDate.value = new Date().toISOString().split('T')[0];
+    fmCategory.value = 'tech';
+    fmTags.value = '';
+    fmSummary.value = '';
+    fmDraft.checked = true;
+    editor.value = '';
+    saveDraft();
+    renderPreview();
+    updateStats();
+    updateFmStatus();
+    editor.focus();
+  });
+
+  // ── Init ──────────────────────────────
+  renderPreview();
+  updateStats();
+  updateFmStatus();
+</script>

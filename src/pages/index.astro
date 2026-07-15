@@ -1,0 +1,318 @@
+---
+import { getCollection } from 'astro:content';
+import siteConfig from '../data/site-config.json';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import EntryLoading from '../components/EntryLoading.astro';
+import BackgroundDebris from '../components/BackgroundDebris.astro';
+import Profile from '../components/modules/Profile.astro';
+import TimeRing from '../components/modules/TimeRing.astro';
+import ArticleCluster from '../components/modules/ArticleCluster.astro';
+import CDPlayer from '../components/modules/CDPlayer.astro';
+import PhotoZineEntry from '../components/modules/PhotoZineEntry.astro';
+import projects from '../data/projects';
+import activities from '../data/activities';
+
+const catEntries = await Promise.all(
+  siteConfig.categories.map(async (cat) => {
+    const posts = (await getCollection('blog', ({ data }) =>
+      data.category === cat.key && !data.draft
+    )).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+    return { ...cat, posts };
+  })
+);
+---
+
+<BaseLayout title="Canvas" description="HelicasE — 一张无边线索画布，信息以几何秩序分布。">
+  <EntryLoading slot="entry-overlay" />
+  <BackgroundDebris />
+
+  <div class="homepage">
+    <h1 class="sr-only">HELICASE personal canvas</h1>
+    <!-- ── Identity ───────────────────────── -->
+    <section class="hero">
+      <div class="hero-profile">
+        <Profile />
+      </div>
+      <div class="hero-creative">
+        <div class="hero-timering"><TimeRing /></div>
+        <a class="oc-signal" href="/oc" aria-label="Enter OC space">
+          <img src="/images/oc/host-idle.gif" alt="" width="128" height="128" />
+          <span>HOST_00 →</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ── Content ────────────────────────── -->
+    <section class="content-grid" aria-labelledby="writings-heading">
+      <div class="content-articles">
+        <div class="articles-header">
+          <span class="articles-label" id="writings-heading">WRITINGS</span>
+          <span class="articles-note">notes · journals · reviews</span>
+          <a href="/blog" class="articles-all">all writings →</a>
+        </div>
+        <div class="articles-clusters">
+          {catEntries.map(cat => (
+            <ArticleCluster category={cat.key} label={cat.label} posts={cat.posts} />
+          ))}
+        </div>
+      </div>
+
+      <div class="content-support">
+        <div class="content-ideas">
+          <section class="now-module" data-module="now">
+            <div class="now-module-head"><span>NOW</span><a href="/now">activity →</a></div>
+            {projects.filter(p => p.status === 'active' && p.visibility === 'public').slice(0, 2).map(project => (
+              <a class="now-project" href={`/projects#${project.id}`}>
+                <strong>{project.name}</strong><span>{project.current}</span><em>{project.progress}%</em>
+              </a>
+            ))}
+            <a class="latest-log" href="/now"><small>LATEST</small>{activities[0]?.title}</a>
+          </section>
+        </div>
+        <div class="content-cdp">
+          <CDPlayer />
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Interests ──────────────────────── -->
+    <section class="footer-row">
+      <a class="interests-entry" href="/interests"><span>INTERESTS</span><strong>music · favorites · zine · mood</strong><em>explore →</em></a>
+      <div class="footer-entries">
+        <a href="/mood" class="footer-entry-link">[ mood → ]</a>
+        <a href="/links" class="footer-entry-link">[ links → ]</a>
+        <PhotoZineEntry />
+      </div>
+    </section>
+
+  </div>
+</BaseLayout>
+
+<style>
+  .homepage {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+    padding-bottom: 80px;
+  }
+
+  /* ── Hero Section ─────────────────────── */
+  .hero {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 48px;
+    padding-top: 24px;
+  }
+
+  .hero-profile {
+    flex: 0 0 auto;
+  }
+
+  .hero-creative {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+  }
+
+  .hero-timering {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .oc-signal {
+    width: 128px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    color: var(--color-silver);
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+  }
+  .oc-signal img { width: 128px; height: 128px; object-fit: contain; opacity: 0.9; }
+  .oc-signal:hover { color: var(--color-blue); }
+
+  /* ── Content Grid ─────────────────────── */
+  .content-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+  }
+
+  .content-articles {
+    min-width: 0;
+  }
+
+  .articles-clusters {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 40px;
+  }
+
+  .articles-clusters > :global(.cluster-module + .cluster-module) { margin-top: 0; }
+
+  .articles-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 28px;
+    padding-bottom: 10px;
+    border-bottom: 0.5px solid var(--color-silver-light);
+  }
+
+  .articles-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--color-blue);
+    letter-spacing: 0.15em;
+  }
+
+  .articles-all {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--color-silver);
+    letter-spacing: 0.08em;
+    transition: color var(--duration-micro);
+  }
+  .articles-all:hover { color: var(--color-blue); }
+
+  .articles-note {
+    font: 400 0.6rem/1 var(--font-mono);
+    color: var(--color-silver-light);
+    letter-spacing: 0.06em;
+  }
+
+  .content-support {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: 48px;
+    align-items: start;
+    padding-top: 24px;
+    border-top: 0.5px solid var(--color-silver-light);
+  }
+
+  .content-ideas {
+    padding-top: 4px;
+  }
+
+  .now-module { font-family: var(--font-mono); }
+  .now-module-head { display:flex;justify-content:space-between;border-bottom:1px solid var(--color-silver-light);padding-bottom:7px;margin-bottom:8px; }
+  .now-module-head span { font-size:.65rem;letter-spacing:.15em;color:var(--color-blue);font-weight:600; }
+  .now-module-head a { font-size:.55rem;color:var(--color-silver); }
+  .now-project { display:grid;grid-template-columns:1fr auto;gap:4px;padding:10px 0;border-bottom:1px solid var(--color-silver-light); }
+  .now-project strong { font-size:.68rem; }
+  .now-project span { grid-column:1/-1;font:400 .68rem/1.5 var(--font-body);color:var(--color-text-secondary); }
+  .now-project em { grid-column:2;grid-row:1;font-size:.65rem;font-style:normal;color:var(--color-silver); }
+  .latest-log { display:block;margin-top:13px;font:400 .65rem/1.5 var(--font-body); }
+  .latest-log small { display:block;font:500 .5rem var(--font-mono);color:var(--color-blue);margin-bottom:4px;letter-spacing:.12em; }
+  .interests-entry { min-width:270px;display:flex;flex-direction:column;gap:8px;font-family:var(--font-mono); }
+  .interests-entry span { font-size:.58rem;color:var(--color-blue);letter-spacing:.15em; }
+  .interests-entry strong { font-size:.7rem;font-weight:400; }
+  .interests-entry em { font-size:.58rem;color:var(--color-silver);font-style:normal; }
+  .homepage :global(.profile-edit-badge),
+  .homepage :global(.profile-add-link),
+  .homepage :global(.profile-inline-form) { display: none !important; }
+
+  .content-cdp {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 4px;
+  }
+
+  /* ── Footer Row ───────────────────────── */
+  .footer-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 48px;
+    padding-top: 16px;
+    border-top: 0.5px solid var(--color-silver-light);
+  }
+
+  .footer-entries {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .footer-entry-link {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: var(--color-silver);
+    letter-spacing: 0.08em;
+    transition: color var(--duration-micro);
+  }
+  .footer-entry-link:hover { color: var(--color-blue); }
+
+  /* ── Responsive: Tablet (768–1023px) ──── */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .hero {
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .hero-creative {
+      gap: 24px;
+    }
+
+    .articles-clusters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .content-support { grid-template-columns: minmax(0, 1fr) 200px; }
+  }
+
+  /* ── Responsive: Mobile (<768px) ──────── */
+  @media (max-width: 767px) {
+    .homepage {
+      padding: 0 16px;
+      gap: 32px;
+    }
+
+    .hero {
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding-top: 8px;
+    }
+
+    .hero-creative {
+      gap: 16px;
+    }
+
+    .articles-header { align-items: center; flex-wrap: wrap; }
+    .articles-note { display: none; }
+    .articles-clusters { grid-template-columns: 1fr; gap: 28px; }
+    .content-support { grid-template-columns: 1fr; gap: 28px; }
+
+    .content-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .footer-row {
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+  }
+
+  /* ── Responsive: Large desktop (1440px+) ─ */
+  @media (min-width: 1440px) {
+    .homepage {
+      max-width: 1360px;
+    }
+
+    .articles-clusters { gap: 56px; }
+    .content-support { grid-template-columns: minmax(0, 1fr) 260px; gap: 64px; }
+  }
+</style>

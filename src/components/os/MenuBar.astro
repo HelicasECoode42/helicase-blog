@@ -1,0 +1,29 @@
+---
+// ============================================
+// HELICASE DESKTOP.OS — MenuBar
+// Top bar with Apple menu + clock.
+// ============================================
+---
+<header class="os-menubar" id="os-menubar">
+  <span class="os-menubar__apple" title="About HelicasE">⬡</span>
+  <span class="os-menubar__menu">Files</span>
+  <span class="os-menubar__menu">Edit</span>
+  <span class="os-menubar__menu">View</span>
+  <span class="os-menubar__menu">Terminal</span>
+  <span class="os-menubar__menu">Help</span>
+  <span class="os-menubar__spacer"></span>
+  <span class="os-menubar__extra" id="os-clock">--</span>
+</header>
+
+<script>
+  function tick() {
+    const el = document.getElementById('os-clock');
+    if (!el) return;
+    const now = new Date();
+    const d = now.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+    const t = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    el.textContent = `${d}  ${t}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+</script>

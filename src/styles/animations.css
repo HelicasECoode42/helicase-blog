@@ -1,0 +1,101 @@
+/* ============================================
+   HELICASE — Animation System
+   Single easing curve: cubic-bezier(0.2, 0, 0.8, 1)
+   Mechanical precision. Fast start, fast stop.
+   Only animate GPU-composited properties.
+   ============================================ */
+
+/* ── Animation Laws ────────────────────────
+   1. Only animate transform, opacity, filter, color
+   2. NEVER animate width, height, margin, padding, top, left
+   3. Use will-change sparingly — only during animation
+   4. All animations use var(--ease-mechanical)
+   ============================================ */
+
+/* ── Utility Transition Classes ─────────── */
+.mechanical-fade {
+  transition: opacity var(--duration-normal) var(--ease-mechanical);
+}
+
+.mechanical-color {
+  transition: color var(--duration-micro) var(--ease-mechanical),
+              background-color var(--duration-micro) var(--ease-mechanical);
+}
+
+.mechanical-transform {
+  transition: transform var(--duration-normal) var(--ease-mechanical);
+}
+
+/* ── Keyframes ──────────────────────────── */
+
+/* Line tightening: dashed → solid, like a pulled-taut thread */
+@keyframes line-tighten {
+  0%   { opacity: 0; transform: scaleX(0.5); }
+  100% { opacity: 1; transform: scaleX(1); }
+}
+
+/* Disc brake: inertia → force removal → sharp deceleration */
+@keyframes disc-brake {
+  0%   { transform: rotate(0deg); }
+  70%  { transform: rotate(270deg); animation-timing-function: cubic-bezier(0.2, 0, 0.4, 1); }
+  100% { transform: rotate(315deg); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+}
+
+/* Disc spin-up: accelerate from 0 to full speed */
+@keyframes disc-spin-up {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Disc constant rotation (3s per revolution) */
+@keyframes disc-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Entry overlay: shrink to center and fade */
+@keyframes entry-shrink-out {
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.8); }
+}
+
+/* Canvas expand: grow from center and fade in */
+@keyframes canvas-expand-in {
+  0%   { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Faint blue pulse (for CORE hover) */
+@keyframes blue-pulse {
+  0%, 100% { text-shadow: 0 0 4px rgba(51,78,213,0.10), 0 0 8px rgba(51,78,213,0.05); }
+  50%      { text-shadow: 0 0 6px rgba(51,78,213,0.18), 0 0 12px rgba(51,78,213,0.08); }
+}
+
+/* ── View Transition Overrides ──────────── */
+
+/* Smooth module fade-out on navigation */
+::view-transition-old(canvas-modules) {
+  animation: var(--duration-normal) var(--ease-mechanical) both entry-shrink-out;
+}
+
+::view-transition-new(post-content) {
+  animation: var(--duration-layer) var(--ease-mechanical) both canvas-expand-in;
+}
+
+/* Shared title element flies between canvases */
+::view-transition-old(article-title),
+::view-transition-new(article-title) {
+  animation-duration: var(--duration-layer);
+  animation-timing-function: var(--ease-mechanical);
+}
+
+/* ── Reduced Motion ─────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "categories": [
+    { "key": "tech",    "label": "TECH BLOG" },
+    { "key": "daily",   "label": "DAILY / ESSAY" },
+    { "key": "reviews", "label": "REVIEWS" }
+  ],
+  "inspirationPile": [
+    { "text": "给 OC 做 Galgame", "done": false },
+    { "text": "学 Blender", "done": false },
+    { "text": "做个 CLI 工具", "done": false }
+  ]
+}

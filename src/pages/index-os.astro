@@ -1,0 +1,466 @@
+---
+// ============================================
+// HELICASE DESKTOP.OS — Prototype v0.1
+// Desktop metaphor: icons, dock, terminal, finder.
+// Accessible at /os during development.
+// ============================================
+import { getCollection } from 'astro:content';
+import siteConfig from '../data/site-config.json';
+import { ASCII_PATTERNS, PATTERN_ORDER } from '../lib/asciiPatterns';
+import MenuBar from '../components/os/MenuBar.astro';
+import Dock from '../components/os/Dock.astro';
+import '../styles/tokens.css';
+import '../styles/reset.css';
+import '../styles/os/os-chrome.css';
+
+// ── Collect article data for Finder windows ──
+const catEntries = await Promise.all(
+  siteConfig.categories.map(async (cat) => {
+    const posts = (await getCollection('blog', ({ data }) =>
+      data.category === cat.key && !data.draft
+    )).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
+    return { ...cat, posts };
+  })
+);
+
+// Build finder items per category
+const finderData = catEntries.map(cat => ({
+  id: cat.key,
+  label: cat.label,
+  items: cat.posts.map(p => ({
+    name: p.data.title,
+    kind: cat.key === 'tech' ? 'Markdown' : cat.key === 'daily' ? 'Journal' : 'Review',
+    href: `/blog/${p.id.replace(/\//g, '-')}`,
+    date: p.data.date.toISOString().slice(0, 10),
+  })),
+}));
+
+const dockItems = [
+  { id: 'finder-tech',  icon: '📁', label: 'TECH' },
+  { id: 'finder-daily', icon: '📝', label: 'DAILY' },
+  { id: 'finder-review', icon: '🎬', label: 'REVIEW' },
+  { id: 'terminal',    icon: '⬡', label: 'TERM' },
+  { id: 'zine',         icon: '📷', label: 'ZINE' },
+  { id: 'music',        icon: '💿', label: 'MUSIC' },
+  { id: 'favorites',    icon: '❤️', label: 'FAVES' },
+];
+
+// Serialize ASCII patterns for client-side terminal
+const allPatterns = JSON.stringify(ASCII_PATTERNS);
+const patternOrder = JSON.stringify(PATTERN_ORDER);
+
+// Serialize finder data for client-side window content
+const finderDataJson = JSON.stringify(finderData);
+---
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DESKTOP.OS | HELICASE</title>
+  <meta name="description" content="HelicasE — Desktop Environment" />
+
+</head>
+<body>
+  <!-- ── Desktop ──────────────────────────── -->
+  <div class="os-desktop" id="os-desktop">
+    <!-- Menu bar -->
+    <MenuBar />
+
+    <!-- Desktop icons -->
+    <div class="os-icons" id="os-icons">
+      <div class="os-icon" data-win-id="finder-tech" role="button" tabindex="0" aria-label="Open TECH">
+        <div class="os-icon__img">📁</div>
+        <div class="os-icon__label">TECH</div>
+      </div>
+      <div class="os-icon" data-win-id="finder-daily" role="button" tabindex="0" aria-label="Open DAILY">
+        <div class="os-icon__img">📝</div>
+        <div class="os-icon__label">DAILY</div>
+      </div>
+      <div class="os-icon" data-win-id="finder-review" role="button" tabindex="0" aria-label="Open REVIEW">
+        <div class="os-icon__img">🎬</div>
+        <div class="os-icon__label">REVIEW</div>
+      </div>
+      <div class="os-icon" data-win-id="zine" role="button" tabindex="0" aria-label="Open ZINE">
+        <div class="os-icon__img">📷</div>
+        <div class="os-icon__label">ZINE</div>
+      </div>
+      <div class="os-icon" data-win-id="music" role="button" tabindex="0" aria-label="Open MUSIC">
+        <div class="os-icon__img">💿</div>
+        <div class="os-icon__label">MUSIC</div>
+      </div>
+      <div class="os-icon" data-win-id="favorites" role="button" tabindex="0" aria-label="Open FAVES">
+        <div class="os-icon__img">❤️</div>
+        <div class="os-icon__label">FAVES</div>
+      </div>
+    </div>
+
+    <!-- Desktop hint -->
+    <div class="os-hint">double-click icons to open · drag windows to arrange</div>
+
+    <!-- Dock -->
+    <Dock items={dockItems} />
+
+    <!-- Mobile fallback -->
+    <div class="os-mobile-banner">
+      <h2>⬡ DESKTOP.OS</h2>
+      <p>This experience is designed for desktop screens. Please visit on a larger display.</p>
+    </div>
+  </div>
+
+  <!-- Data from server (consumed by client JS) -->
+  <script type="application/json" id="data-patterns">{allPatterns}</script>
+  <script type="application/json" id="data-pattern-order">{patternOrder}</script>
+  <script type="application/json" id="data-finder">{finderDataJson}</script>
+
+  <!-- ── Client Script ────────────────────── -->
+  <script type="module">
+    // @ts-nocheck -- isolated experimental desktop prototype.
+    import { WindowManager } from '/os/window-manager.js';
+
+    // ── Data from server ────────────────────
+    const PATTERNS = JSON.parse(document.getElementById('data-patterns').textContent);
+    const PATTERN_ORDER_ARR = JSON.parse(document.getElementById('data-pattern-order').textContent);
+    const FINDER_DATA = JSON.parse(document.getElementById('data-finder').textContent);
+
+    // ── Init WindowManager ──────────────────
+    const desktop = document.getElementById('os-desktop');
+    const wm = WindowManager.init(desktop);
+
+    // ── Register window types ───────────────
+
+    // Terminal
+    wm.register({
+      id: 'terminal',
+      title: 'Terminal — helicase@desktop',
+      icon: '⬡',
+      width: 520,
+      height: 340,
+      minWidth: 300,
+      minHeight: 200,
+      content: createTerminalContent,
+    });
+
+    // Finder windows (one per category)
+    for (const cat of FINDER_DATA) {
+      wm.register({
+        id: `finder-${cat.id}`,
+        title: `${cat.label}`,
+        icon: '📁',
+        width: 380,
+        height: 320,
+        minWidth: 260,
+        minHeight: 180,
+        content: (state) => createFinderContent(cat, state),
+      });
+    }
+
+    // Zine placeholder
+    wm.register({
+      id: 'zine',
+      title: 'ZINE — Photography',
+      icon: '📷',
+      width: 560,
+      height: 420,
+      minWidth: 300,
+      minHeight: 240,
+      content: () => createPlaceholderContent('📷', 'ZINE', 'Photography collection coming soon.', '/zine'),
+    });
+
+    // Music placeholder
+    wm.register({
+      id: 'music',
+      title: 'Music — CD Player',
+      icon: '💿',
+      width: 400,
+      height: 360,
+      minWidth: 280,
+      minHeight: 240,
+      content: () => createPlaceholderContent('💿', 'CD PLAYER', 'Music player coming soon.', '/music'),
+    });
+
+    // Favorites placeholder
+    wm.register({
+      id: 'favorites',
+      title: 'Favorites',
+      icon: '❤️',
+      width: 440,
+      height: 360,
+      minWidth: 280,
+      minHeight: 220,
+      content: () => createPlaceholderContent('❤️', 'FAVORITES', 'Your curated collection.', '/favorites'),
+    });
+
+    // ── Content factories ───────────────────
+
+    function createTerminalContent() {
+      const el = document.createElement('div');
+      el.className = 'term';
+      el.innerHTML = `
+        <div class="term__output" id="term-lines">${escapeHtml(PATTERNS['hex'][0])}</div>
+        <div class="term__prompt">
+          <span class="term__prompt-symbol">❯</span>
+          <input class="term__input" id="term-input" type="text"
+            placeholder="type help..." autocomplete="off" spellcheck="false" />
+        </div>`;
+      return el;
+    }
+
+    function createFinderContent(cat, state) {
+      const el = document.createElement('div');
+      el.className = 'finder';
+      const itemsHtml = cat.items.length > 0
+        ? cat.items.map(item => `
+            <div class="finder__item" data-href="${item.href}" tabindex="0" role="link">
+              <span class="finder__item-icon">📄</span>
+              <div class="finder__item-info">
+                <span class="finder__item-name">${escapeHtml(item.name)}</span>
+                <span class="finder__item-meta">${item.kind} · ${item.date}</span>
+              </div>
+              <span class="finder__item-arrow">→</span>
+            </div>`).join('')
+        : `<div style="padding:20px;color:var(--color-silver);font-family:var(--font-mono);font-size:0.7rem;">empty folder</div>`;
+
+      el.innerHTML = `
+        <div class="finder__header">${cat.label} — ${cat.items.length} items</div>
+        ${itemsHtml}`;
+      return el;
+    }
+
+    function createPlaceholderContent(emoji, title, desc, href) {
+      const el = document.createElement('div');
+      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:24px;';
+      el.innerHTML = `
+        <div style="font-size:3rem;opacity:0.4">${emoji}</div>
+        <div style="font-family:var(--font-mono);font-size:0.7rem;color:var(--color-silver);letter-spacing:0.08em;text-align:center">${desc}</div>
+        <a href="${href}" style="font-family:var(--font-mono);font-size:0.65rem;color:var(--color-blue);text-decoration:none;border:1px solid var(--color-silver-light);padding:6px 14px;transition:all var(--duration-micro)">open ${title} →</a>`;
+      return el;
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    // ── Terminal animation engine ────────────
+    let termPatternIdx = 0;
+    let termFrame = 0;
+    let termAnimId = 0;
+    let termActive = false;
+    let termLastTime = 0;
+    let termAccum = 0;
+    const TERM_FPS = 10;
+    const TERM_INTERVAL = 1000 / TERM_FPS;
+
+    function startTerminalAnim() {
+      if (termActive) return;
+      termActive = true;
+      termLastTime = performance.now();
+      termAccum = 0;
+      termAnimId = requestAnimationFrame(termTick);
+    }
+
+    function stopTerminalAnim() {
+      termActive = false;
+      if (termAnimId) { cancelAnimationFrame(termAnimId); termAnimId = 0; }
+    }
+
+    function termTick(now) {
+      if (!termActive) return;
+      const delta = Math.min(now - termLastTime, 100);
+      termLastTime = now;
+      termAccum += delta;
+      while (termAccum >= TERM_INTERVAL) {
+        termAccum -= TERM_INTERVAL;
+        const frames = PATTERNS[PATTERN_ORDER_ARR[termPatternIdx]];
+        termFrame = (termFrame + 1) % frames.length;
+        const out = document.getElementById('term-lines');
+        if (out) out.textContent = frames[termFrame];
+      }
+      termAnimId = requestAnimationFrame(termTick);
+    }
+
+    async function cycleTermPattern() {
+      if (window.__termTransition) return;
+      window.__termTransition = true;
+      const out = document.getElementById('term-lines');
+      if (!out) { window.__termTransition = false; return; }
+      out.style.transition = 'opacity 80ms cubic-bezier(0.2,0,0.8,1)';
+      out.style.opacity = '0';
+      await sleep(80);
+      termPatternIdx = (termPatternIdx + 1) % PATTERN_ORDER_ARR.length;
+      termFrame = 0;
+      termAccum = 0;
+      out.textContent = PATTERNS[PATTERN_ORDER_ARR[termPatternIdx]][0];
+      out.style.transition = 'opacity 150ms cubic-bezier(0.2,0,0.8,1)';
+      out.style.opacity = '1';
+      await sleep(150);
+      out.style.transition = '';
+      window.__termTransition = false;
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // ── Terminal command handling ────────────
+    function handleTermCommand(cmd) {
+      const out = document.getElementById('term-lines');
+      if (!out) return;
+      const trimmed = cmd.trim().toLowerCase();
+      let response = '';
+
+      switch (true) {
+        case trimmed === 'help':
+          response = [
+            'available commands:',
+            '  help        — show this message',
+            '  about       — about helicase',
+            '  clear       — clear terminal',
+            '  ls / dir    — list files on desktop',
+            '  date        — show current date',
+            '  whoami      — display username',
+            '  next        — cycle ASCII pattern',
+            '  open <app>  — open: tech, daily, review, zine, music, faves',
+            '  exit        — close terminal',
+          ].join('\n');
+          break;
+        case trimmed === 'about':
+          response = 'HELICASE DESKTOP.OS v0.1\nbuilt with Astro + vanilla JS\n"like a computer, not a website"';
+          break;
+        case trimmed === 'clear':
+          out.textContent = '';
+          return;
+        case trimmed === 'ls' || trimmed === 'dir':
+          response = '📁 TECH/\n📝 DAILY/\n🎬 REVIEW/\n📷 ZINE/\n💿 MUSIC/\n❤️ FAVES/';
+          break;
+        case trimmed === 'date':
+          response = new Date().toString();
+          break;
+        case trimmed === 'whoami':
+          response = 'helicase@desktop';
+          break;
+        case trimmed === 'next':
+          cycleTermPattern();
+          response = '> pattern cycled';
+          break;
+        case trimmed.startsWith('open '):
+          const app = trimmed.slice(5).trim();
+          const winId = app === 'tech' ? 'finder-tech' :
+                        app === 'daily' ? 'finder-daily' :
+                        app === 'review' ? 'finder-review' :
+                        app === 'zine' ? 'zine' :
+                        app === 'music' ? 'music' :
+                        app === 'faves' ? 'favorites' : null;
+          if (winId) {
+            wm.open(winId);
+            response = `> opened ${app}`;
+          } else {
+            response = `> unknown app: ${app}. try: tech, daily, review, zine, music, faves`;
+          }
+          break;
+        case trimmed === 'exit':
+          wm.close('terminal');
+          stopTerminalAnim();
+          return;
+        default:
+          if (trimmed) response = `command not found: ${trimmed}\ntype "help" for available commands`;
+          break;
+      }
+
+      out.textContent += '\n\n❯ ' + cmd + '\n' + response;
+      // Auto-scroll
+      const termBody = out.closest('.term');
+      if (termBody) termBody.scrollTop = termBody.scrollHeight;
+    }
+
+    // ── Desktop icon interaction ─────────────
+    let selectedIcon = null;
+
+    document.querySelectorAll('.os-icon').forEach(icon => {
+      // Single click: select
+      icon.addEventListener('click', (e) => {
+        if (selectedIcon) selectedIcon.classList.remove('os-icon--selected');
+        icon.classList.add('os-icon--selected');
+        selectedIcon = icon;
+      });
+
+      // Double click: open window
+      icon.addEventListener('dblclick', () => {
+        const winId = icon.dataset.winId;
+        if (winId) wm.open(winId);
+
+        // If opening terminal, start animation
+        if (winId === 'terminal') {
+          setTimeout(() => startTerminalAnim(), 300);
+        }
+      });
+    });
+
+    // Click on empty desktop → deselect
+    desktop.addEventListener('click', (e) => {
+      if (e.target === desktop || e.target.classList.contains('os-hint')) {
+        if (selectedIcon) {
+          selectedIcon.classList.remove('os-icon--selected');
+          selectedIcon = null;
+        }
+      }
+    });
+
+    // ── Dock click ───────────────────────────
+    document.querySelectorAll('.dock__item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.dockId;
+        if (!id) return;
+
+        if (wm.isOpen(id)) {
+          wm.focus(id);
+        } else {
+          wm.open(id);
+          if (id === 'terminal') {
+            setTimeout(() => startTerminalAnim(), 300);
+          }
+        }
+      });
+    });
+
+    // ── Finder item click → navigate ─────────
+    desktop.addEventListener('click', (e) => {
+      const item = e.target.closest('.finder__item');
+      if (!item) return;
+      const href = item.dataset.href;
+      if (href) {
+        // Open in new tab for now (prototype)
+        window.open(href, '_blank');
+      }
+    });
+
+    // ── Terminal input ───────────────────────
+    desktop.addEventListener('keydown', (e) => {
+      const input = e.target;
+      if (input.id !== 'term-input') return;
+      if (e.key === 'Enter') {
+        const cmd = input.value;
+        input.value = '';
+        handleTermCommand(cmd);
+      }
+    });
+
+    // ── Menubar click → about ────────────────
+    const apple = document.querySelector('.os-menubar__apple');
+    if (apple) {
+      apple.addEventListener('click', () => {
+        // Simple about alert for prototype
+        const aboutWin = wm.getState('terminal');
+        alert('⬡ HELICASE DESKTOP.OS\nv0.1 prototype\n\nBuilt with Astro + Vanilla JS\nhelicase.pages.dev');
+      });
+    }
+
+    // ── Boot: open terminal by default ────────
+    wm.open('terminal');
+    setTimeout(() => startTerminalAnim(), 500);
+
+    console.log('⬡ DESKTOP.OS v0.1 booted. type "help" in the terminal.');
+  </script>
+</body>
+</html>

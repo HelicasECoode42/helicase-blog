@@ -1,0 +1,23 @@
+---
+// ============================================
+// HELICASE DESKTOP.OS — DesktopIcon
+// Props: icon (emoji), label, windowId
+// ============================================
+export interface Props {
+  icon: string
+  label: string
+  windowId: string
+}
+
+const { icon, label, windowId } = Astro.props;
+---
+<div
+  class="os-icon"
+  data-win-id={windowId}
+  role="button"
+  tabindex="0"
+  aria-label={`Open ${label}`}
+>
+  <div class="os-icon__img">{icon}</div>
+  <div class="os-icon__label">{label}</div>
+</div>

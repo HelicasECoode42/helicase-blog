@@ -1,0 +1,107 @@
+---
+// ============================================
+// HELICASE — About Page
+// Minimal, personal, on-brand.
+// ============================================
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="About" description="关于 HELICASE">
+  <div class="about-page">
+    <a href="/" class="about-back">← canvas</a>
+
+    <h1 class="about-title">ABOUT</h1>
+
+    <div class="about-body">
+      <p>
+        这是 HelicasE 的个人空间。一张线索画布，连接技术、日常与审美。
+      </p>
+      <p>
+        HELICASE 这个名字来自解旋酶——DNA 复制时解开双链的那把分子机器。
+        把信息拆开、重新编织，就是这里在做的事。
+      </p>
+      <p>
+        这个网站用 <a href="https://astro.build" target="_blank" rel="noopener">Astro</a> 构建，
+        纯 CSS 设计系统，Three.js 做了一点小装置，
+        部署在 Cloudflare Pages 上。
+      </p>
+
+      <hr class="about-divider" />
+
+      <div class="about-links">
+        <a href="/blog" class="about-link">writings →</a>
+        <a href="/music" class="about-link">music →</a>
+        <a href="/zine" class="about-link">zine →</a>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .about-page {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 64px 24px 120px;
+  }
+
+  .about-back {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-silver);
+    letter-spacing: 0.08em;
+    transition: color var(--duration-micro);
+    display: inline-block;
+    margin-bottom: 32px;
+  }
+  .about-back:hover { color: var(--color-blue); }
+
+  .about-title {
+    font: 700 0.75rem/1 var(--font-mono);
+    color: var(--color-deep-blue);
+    letter-spacing: 0.2em;
+    margin-bottom: 32px;
+  }
+
+  .about-body {
+    font: var(--text-body);
+    color: var(--color-black);
+    line-height: 1.85;
+  }
+
+  .about-body p {
+    margin-bottom: 18px;
+  }
+
+  .about-body a {
+    color: var(--color-blue);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  .about-body a:hover { opacity: 0.7; }
+
+  .about-divider {
+    border: none;
+    border-top: var(--line-width) solid var(--color-silver-light);
+    margin: 32px 0;
+  }
+
+  .about-links {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .about-link {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-silver);
+    letter-spacing: 0.06em;
+    transition: color var(--duration-micro);
+  }
+  .about-link:hover { color: var(--color-blue); }
+
+  @media (max-width: 767px) {
+    .about-page { padding: 40px 16px 80px; }
+  }
+</style>
