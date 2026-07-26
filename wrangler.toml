@@ -2,6 +2,12 @@ name = "helicase-blog"
 main = "worker/index.ts"
 compatibility_date = "2026-07-15"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "helicase-blog-data"
+database_id = "e6936c00-29ed-4d48-930e-4ba3398d6dda"
+migrations_dir = "migrations"
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
