@@ -22,7 +22,8 @@ const categories = siteConfig.categories;
       </div>
       <div class="editor-topbar-right">
         <button class="editor-btn editor-btn-ghost" id="btn-clear" title="New post">new</button>
-        <button class="editor-btn editor-btn-primary" id="btn-export" title="Download .md file">export ↓</button>
+        <button class="editor-btn editor-btn-ghost" id="btn-export" title="Download .md file">export ↓</button>
+        <button class="editor-btn editor-btn-primary" id="btn-publish" title="Publish to GitHub">publish →</button>
       </div>
     </div>
 
@@ -522,6 +523,7 @@ const categories = siteConfig.categories;
   const sbLines = document.getElementById('sb-lines');
   const sbSave = document.getElementById('sb-save');
   const btnExport = document.getElementById('btn-export');
+  const btnPublish = document.getElementById('btn-publish');
   const btnClear = document.getElementById('btn-clear');
 
   // Set default date to today
@@ -731,7 +733,7 @@ const categories = siteConfig.categories;
   });
 
   // ── Export ────────────────────────────
-  btnExport.addEventListener('click', function() {
+  function buildArticle() {
     var title = fmTitle.value.trim();
     var date = fmDate.value || new Date().toISOString().split('T')[0];
     var category = fmCategory.value;
@@ -744,7 +746,7 @@ const categories = siteConfig.categories;
       document.getElementById('fm-details').open = true;
       fmStatus.textContent = 'title, summary and body required';
       fmStatus.classList.remove('complete');
-      return;
+      return null;
     }
 
     var tags = tagsRaw
@@ -764,9 +766,6 @@ const categories = siteConfig.categories;
     fmLines.push('');
 
     var content = fmLines.join('\n') + body;
-    var blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-
     var slug = title.toLowerCase()
       .normalize('NFKC')
       .replace(/[^\p{Letter}\p{Number}\s-]/gu, '')
@@ -776,15 +775,47 @@ const categories = siteConfig.categories;
       .substring(0, 50);
     var filename = date + '-' + slug + '.md';
 
+    return { content, category, date, title, filename };
+  }
+
+  btnExport.addEventListener('click', function() {
+    var article = buildArticle();
+    if (!article) return;
+    var blob = new Blob([article.content], { type: 'text/markdown;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = filename;
+    a.download = article.filename;
     a.click();
     URL.revokeObjectURL(url);
-    fmStatus.textContent = 'exported: ' + filename;
+    fmStatus.textContent = 'exported: ' + article.filename;
     fmStatus.classList.add('complete');
     sbSave.textContent = 'exported';
     sbSave.classList.remove('saving');
+  });
+
+  btnPublish.addEventListener('click', async function() {
+    var article = buildArticle();
+    if (!article) return;
+    btnPublish.disabled = true;
+    fmStatus.textContent = 'publishing…';
+    try {
+      var res = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(article),
+      });
+      var result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'publish failed');
+      fmStatus.textContent = 'published: ' + result.path;
+      fmStatus.classList.add('complete');
+      sbSave.textContent = 'published';
+    } catch (error) {
+      fmStatus.textContent = error instanceof Error ? error.message : 'publish failed';
+      fmStatus.classList.remove('complete');
+    } finally {
+      btnPublish.disabled = false;
+    }
   });
 
   // ── Clear / New Post ──────────────────

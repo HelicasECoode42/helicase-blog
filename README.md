@@ -96,6 +96,8 @@ Cloudflare Workers Builds：
 
 如果当前 Cloudflare Zero Trust 需要绑定银行卡，可暂时使用 Worker Basic Auth：在 Worker **Settings → Variables and Secrets** 中新增 `STUDIO_USERNAME`、`STUDIO_PASSWORD` 两个 Secret。Worker 会保护 `/studio*` 与 `/editor*`；真实密码不要提交到 Git，也不要复用在其他服务。
 
+`/editor` 的 `publish →` 需要另外配置 GitHub Secrets：`GITHUB_CONTENT_TOKEN`（仅目标仓库 Contents 读写权限）、`GITHUB_OWNER=HelicasECoode42`、`GITHUB_REPO=helicase-blog`。配置后，发布按钮会将 Markdown 写入 `src/content/blog/<category>/`，再由 GitHub/Cloudflare 自动构建；未配置时只使用 `export ↓` 下载文件。
+
 `wrangler.toml` 使用 Worker + Static Assets：只有 `/api/*` 进入 `worker/index.ts`，其他路由直接读取 `dist`。`public/_headers` 已包含 CSP、HSTS、点击劫持防护、MIME 嗅探防护、Referrer Policy 与 Permissions Policy。不要提交 `.env`、`.dev.vars`、模型 API Key、Obsidian Vault 或 `.helicase/studio-state.json`。
 
 OC 对话已经由 `/api/oc-chat` Worker 代理，并限制方法、请求体、消息数量、单条长度、总长度与上游超时。上线前仍应加入 Turnstile、限流和预算保护；完成这些保护前不要配置生产 `DEEPSEEK_API_KEY`。
