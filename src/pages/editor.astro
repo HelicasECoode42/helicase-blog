@@ -781,6 +781,10 @@ const categories = siteConfig.categories;
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+    fmStatus.textContent = 'exported: ' + filename;
+    fmStatus.classList.add('complete');
+    sbSave.textContent = 'exported';
+    sbSave.classList.remove('saving');
   });
 
   // ── Clear / New Post ──────────────────
