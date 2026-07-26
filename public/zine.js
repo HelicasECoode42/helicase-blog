@@ -197,9 +197,7 @@
   lbClose.addEventListener('click', closeLightbox);
   lbPrev.addEventListener('click', lbPrevFn);
   lbNext.addEventListener('click', lbNextFn);
-  if (lbDel) lbDel.addEventListener('click', function() {
-    if (lbIdx >= 0 && confirm('remove this piece from the gallery?')) deletePhoto(lbIdx);
-  });
+  // Public gallery is read-only. Owner publishing will move to the protected Studio.
 
   lb.addEventListener('click', function(e) {
     if (e.target === lb) closeLightbox();

@@ -8,14 +8,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout title="Favorites" description="书影音归档 — HelicasE">
-  <div class="fav-page">
+  <div class="fav-page public-readonly">
     <h1 class="sr-only">FAVORITES</h1>
     <a href="/" class="fav-back">← canvas</a>
 
     <!-- Top bar: search + sort -->
     <div class="fav-topbar">
       <input type="text" id="fav-search" class="fav-search"
-        placeholder="搜索添加…" autocomplete="off" />
+        placeholder="作者维护收藏内容" autocomplete="off" readonly aria-label="收藏内容由作者维护" />
       <div class="fav-sort" id="fav-sort">
         <span class="fav-sort-label">sort</span>
         <button class="fav-sort-btn fav-sort--active" data-sort="time">time</button>
@@ -87,6 +87,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     transition: color var(--duration-micro);
   }
   .fav-back:hover { color: var(--color-blue); }
+  .fav-page.public-readonly .fav-search,
+  .fav-page.public-readonly .fav-overlay { display: none !important; }
 
   /* ── Top bar ──────────────────────── */
   .fav-topbar {
@@ -419,9 +421,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </div>
     `).join('');
 
-    // Click card → edit
+    // Public cards are read-only; only the future owner Studio will edit them.
     gridEl.querySelectorAll('.fav-card').forEach(card => {
       card.addEventListener('click', () => {
+        if (document.querySelector('.fav-page.public-readonly')) return;
         const id = parseInt((card as HTMLElement).dataset.id!);
         const item = favs.find(f => f.bgmId === id);
         if (item) openEdit(item);
@@ -609,6 +612,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   // Bind search result clicks (delegated)
   gridEl.addEventListener('click', (e) => {
+    if (document.querySelector('.fav-page.public-readonly')) return;
     const card = (e.target as HTMLElement).closest('.fav-card') as HTMLElement;
     if (!card) return;
     const id = parseInt(card.dataset.id!);

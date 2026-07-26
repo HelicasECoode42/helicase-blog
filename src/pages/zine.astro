@@ -12,7 +12,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <div class="gallery-empty" id="zine-empty">
       <p class="gallery-empty-icon">🖼</p>
       <p>drop an image url or select a file</p>
-      <div class="gallery-empty-actions">
+        <div class="gallery-empty-actions owner-only" aria-hidden="true">
         <input type="text" id="zine-url-inp" placeholder="https://…" />
         <button id="zine-url-add">paste</button>
         <label class="gallery-upload-label">
@@ -22,7 +22,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     </div>
 
     <!-- Upload bar (top, subtle — only visible when there are photos) -->
-    <div class="gallery-upload" id="gallery-upload">
+    <div class="gallery-upload owner-only" id="gallery-upload" aria-hidden="true">
       <input type="text" id="zine-url-inp-top" placeholder="url…" />
       <button id="zine-url-add-top">+</button>
       <label>+<input type="file" id="zine-file-inp-top" accept="image/*" multiple hidden /></label>
@@ -31,7 +31,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <!-- Lightbox / Art viewer -->
     <div class="lightbox" id="lightbox">
       <button class="lightbox-close" id="lightbox-close">×</button>
-      <button class="lightbox-del" id="lightbox-del" title="delete">
+      <button class="lightbox-del owner-only" id="lightbox-del" title="delete" aria-hidden="true" tabindex="-1">
         <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 4h8M5 4V3h4v1M4 4v7h6V4" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
       </button>
       <button class="lightbox-prev" id="lightbox-prev">‹</button>
@@ -192,6 +192,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     border-color: var(--color-blue);
     color: var(--color-blue);
   }
+  .owner-only { display: none !important; }
 
   /* ── Upload Bar (subtle) ───────────── */
   .gallery-upload {
