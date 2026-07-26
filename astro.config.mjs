@@ -4,7 +4,7 @@ import { defineConfig } from 'astro/config';
 // https://astro.build/config
 export default defineConfig({
   output: 'static',
-  site: 'https://helicase.pages.dev',
+  site: process.env.SITE_URL || 'https://helicase.pages.dev',
 
   markdown: {
     shikiConfig: {

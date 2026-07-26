@@ -11,7 +11,7 @@ Obsidian / Quick Capture
   → npm run publish:captures
   → npm run verify
   → git push
-  → Cloudflare Pages
+  → Cloudflare Workers Builds
 ```
 
 ### 启动本地 Studio
@@ -73,7 +73,7 @@ npm run new:post -- tech "文章标题"
 3. 完成标题、摘要、标签和正文后，将 `draft` 改为 `false`。
 4. 运行 `npm run verify`。公开文章的摘要仍为 `TODO` 时验证会失败。
 5. 打开 `/blog` 搜索文章标题或正文词，确认分类、详情页和前后篇导航正确。
-6. 提交并推送后由 Cloudflare Pages 构建；不要上传整个 Obsidian Vault、`.helicase/`、`.env` 或密钥。
+6. 提交并推送后由 Cloudflare Workers Builds 构建；不要上传整个 Obsidian Vault、`.helicase/`、`.env` 或密钥。
 
 完整开发与安全边界见 [`DEVELOPMENT-CONTRACT.md`](./DEVELOPMENT-CONTRACT.md)。
 
@@ -83,18 +83,32 @@ npm run new:post -- tech "文章标题"
 npm run verify
 ```
 
-Cloudflare Pages：
+Cloudflare Workers Builds：
 
 - Production branch：`main`
 - Build command：`npm run verify`
-- Output directory：`dist`
-- Node.js：`22`
+- Deploy command：`npx wrangler deploy`
+- Root directory：`/`
+- Build variable：`NODE_VERSION=22.12.0`
+- Build variable：`SITE_URL=https://<最终 workers.dev 或自定义域名>`
 - 强制 HTTPS：开启
 - `/studio`、`/editor`：Cloudflare Zero Trust Access 限制为站长邮箱
 
-`public/_headers` 已包含 CSP、HSTS、点击劫持防护、MIME 嗅探防护、Referrer Policy 与 Permissions Policy。不要提交 `.env`、模型 API Key、Obsidian Vault 或 `.helicase/studio-state.json`。
+`wrangler.toml` 使用 Worker + Static Assets：只有 `/api/*` 进入 `worker/index.ts`，其他路由直接读取 `dist`。`public/_headers` 已包含 CSP、HSTS、点击劫持防护、MIME 嗅探防护、Referrer Policy 与 Permissions Policy。不要提交 `.env`、`.dev.vars`、模型 API Key、Obsidian Vault 或 `.helicase/studio-state.json`。
 
-OC 对话在接入 Cloudflare Worker 前保持为无网络的公开知识原型。将来 Worker 必须只检索公开数据，API Key 存 Cloudflare Secret，并加入 Turnstile、限流、预算和输入长度限制。
+OC 对话已经由 `/api/oc-chat` Worker 代理，并限制方法、请求体、消息数量、单条长度、总长度与上游超时。上线前仍应加入 Turnstile、限流和预算保护；完成这些保护前不要配置生产 `DEEPSEEK_API_KEY`。
+
+完整 Worker 打包检查：
+
+```sh
+npm run check:worker
+```
+
+本地运行真实 Worker 路由（不同于只提供静态页面的 `npm run dev`）：
+
+```sh
+npm run dev:worker
+```
 
 ## 数据边界与维护
 
@@ -102,14 +116,14 @@ OC 对话在接入 Cloudflare Worker 前保持为无网络的公开知识原型�
 - Editor 草稿、收藏、情绪板、Zine、播放器和 OS 布局使用 `localStorage`，只存在当前浏览器，不会跨设备同步、自动备份或自动公开。清理站点数据会丢失这些内容。
 - Studio 使用本机 `127.0.0.1:4317` API 和 `.helicase/studio-state.json`；捕获内容只有在批准并运行相应发布脚本后才可能进入公开数据。
 - `publish:profile` 会拒绝超长字段、不安全协议和异常结构；社交链接必须是 HTTPS，头像必须是 HTTPS 或 `/images/...` 站内路径。
-- 每次发布前运行 `npm run verify`。定期运行 `npm audit`；当前保留的低危 esbuild 告警只影响 Windows 本地开发服务器，修复要求 Astro 7 破坏性升级，应在单独迁移分支处理。
+- 每次发布前运行 `npm run check:worker`。定期运行 `npm audit`；当前低危告警属于开发工具依赖，破坏性升级应在单独迁移分支处理。
 - Three.js 仅在 `/music` 空闲时动态加载。它会产生约 500KB 以上的延迟 chunk，但不会阻塞其他页面首屏，这是有意的性能权衡。
-- Cloudflare Pages、Zero Trust、域名、DNS 和 Secrets 属于外部账号配置；本地代码无法证明它们已经正确启用，上线前需在 Cloudflare 控制台单独核验。
+- Cloudflare Workers、Zero Trust、域名、DNS 和 Secrets 属于外部账号配置；本地代码无法证明它们已经正确启用，上线前需在 Cloudflare 控制台单独核验。
 
 ### 环境变量
 
-- `.env`：本地 Node 脚本设置；当前只有可选的 `HELICASE_STUDIO_PORT`，默认 `4177`。
-- `.dev.vars`：本地 Cloudflare Function 密钥；当前只有 OC 联网对话使用的 `DEEPSEEK_API_KEY`。
+- `.env`：本地 Node 脚本设置；`HELICASE_STUDIO_PORT` 默认 `4177`。本地指定 canonical 时使用 `SITE_URL=https://... npm run verify`；Cloudflare Builds 直接注入 `SITE_URL`。
+- `.dev.vars`：本地 Worker 密钥；当前只有 OC 联网对话使用的 `DEEPSEEK_API_KEY`。
 - 两个真实文件都已被 Git 忽略。可提交模板是 `.env.example` 和 `.dev.vars.example`。
-- Cloudflare 线上环境不要上传 `.dev.vars`；在 Pages 项目的 **Settings → Variables and Secrets** 中新增同名 Secret。
+- Cloudflare 线上环境不要上传 `.dev.vars`；在 Worker 的 **Settings → Variables and Secrets** 中新增同名 Secret。
 - `GITHUB_TOKEN`、D1、Vectorize 和 Workers AI 绑定要等发布/embedding 后端实现后再配置；当前代码不会读取它们。

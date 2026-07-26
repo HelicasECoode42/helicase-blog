@@ -15,12 +15,14 @@
     "sync:activity": "node scripts/sync-activity.mjs",
     "check:content": "node scripts/validate-content.mjs",
     "verify": "npm run check:content && npm run prepare:assets && astro build && node scripts/validate-build.mjs",
+    "check:worker": "npm run verify && XDG_CONFIG_HOME=.wrangler/config XDG_CACHE_HOME=.wrangler/cache WRANGLER_LOG_PATH=.wrangler/wrangler.log WRANGLER_SEND_METRICS=false wrangler deploy --dry-run --outdir .wrangler/dry-run",
     "build": "npm run prepare:assets && astro build",
+    "deploy": "wrangler deploy",
+    "dev:worker": "npm run verify && wrangler dev",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^13.7.0",
     "astro": "^6.4.8",
     "marked": "^15.0.12",
     "sharp": "^0.34.5",
@@ -29,7 +31,9 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
+    "@types/node": "22.15.3",
     "@types/three": "^0.185.1",
-    "typescript": "5.7.3"
+    "typescript": "5.7.3",
+    "wrangler": "4.110.0"
   }
 }
