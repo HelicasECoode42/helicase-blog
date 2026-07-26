@@ -92,7 +92,7 @@ Cloudflare Workers Builds：
 - Build variable：`NODE_VERSION=22.12.0`
 - Build variable：`SITE_URL=https://<最终 workers.dev 或自定义域名>`
 - 强制 HTTPS：开启
-- `/studio`、`/editor`：Cloudflare Zero Trust Access 限制为站长邮箱
+- 生产域名：`https://helicase.xin`（由 `wrangler.toml` 的 custom domain route 管理）
 
 如果当前 Cloudflare Zero Trust 需要绑定银行卡，可暂时使用 Worker Basic Auth：在 Worker **Settings → Variables and Secrets** 中新增 `STUDIO_USERNAME`、`STUDIO_PASSWORD` 两个 Secret。Worker 会保护 `/studio*` 与 `/editor*`；真实密码不要提交到 Git，也不要复用在其他服务。
 
@@ -104,9 +104,15 @@ OC 对话已经由 `/api/oc-chat` Worker 代理，并限制方法、请求体、
 
 ### D1、Turnstile 与审核
 
-公开互动使用名为 `DB` 的 Cloudflare D1 binding。先创建 D1 数据库，在 `wrangler.toml` 中添加对应 `[[d1_databases]]` 的 `database_id`，再执行 `wrangler d1 migrations apply <database-name> --remote` 应用 `migrations/0001_public_space.sql`。
+当前生产环境已绑定 D1：`helicase-blog-data`（binding `DB`，APAC），并已应用 `migrations/0001_public_space.sql`。`/api/content/mood` 已在 `https://helicase.xin` 实测返回 `200`；Favorites、Moodboard、Zine、评论审核、OC 限流和每日预算均可直接使用。
 
-在 Turnstile 为 `helicase.xin` 建立 widget：将 Secret 设为 Worker Secret `TURNSTILE_SECRET_KEY`，将 Site Key 设为 Cloudflare Builds 的 `PUBLIC_TURNSTILE_SITE_KEY`。Secret 存在时，OC 和评论会强制校验 Turnstile。D1 同时执行 OC 每 IP 10 次/小时、每日预算（`OC_DAILY_LIMIT`，默认 100）、评论每 IP 5 次/小时；评论先进入 `pending`，只能由 `/studio` 审核公开。
+如果需要在新账号或新环境复建，再创建 D1、在 `wrangler.toml` 添加 `[[d1_databases]]` 的 `database_id`，并执行：
+
+```sh
+npx wrangler d1 migrations apply helicase-blog-data --remote
+```
+
+Turnstile 尚待在 Cloudflare 控制台创建 widget：将 Secret 设为 Worker Secret `TURNSTILE_SECRET_KEY`，将 Site Key 设为 Cloudflare Builds 的 `PUBLIC_TURNSTILE_SITE_KEY`。Secret 存在时，OC 和评论会强制校验 Turnstile。即使尚未配置 Turnstile，D1 已执行 OC 每 IP 10 次/小时、每日预算（`OC_DAILY_LIMIT`，默认 100）、评论每 IP 5 次/小时；评论先进入 `pending`，只能由 `/studio` 审核公开。
 
 完整 Worker 打包检查：
 
@@ -136,4 +142,4 @@ npm run dev:worker
 - `.dev.vars`：本地 Worker 密钥；当前只有 OC 联网对话使用的 `DEEPSEEK_API_KEY`。
 - 两个真实文件都已被 Git 忽略。可提交模板是 `.env.example` 和 `.dev.vars.example`。
 - Cloudflare 线上环境不要上传 `.dev.vars`；在 Worker 的 **Settings → Variables and Secrets** 中新增同名 Secret。
-- `GITHUB_TOKEN`、D1、Vectorize 和 Workers AI 绑定要等发布/embedding 后端实现后再配置；当前代码不会读取它们。
+- `GITHUB_TOKEN`、Vectorize 和 Workers AI 绑定要等发布/embedding 后端实现后再配置；当前代码不会读取它们。D1 已在生产环境配置完成。
