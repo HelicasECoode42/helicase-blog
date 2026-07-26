@@ -41,7 +41,6 @@ const dockItems = [
   { id: 'finder-review', icon: '🎬', label: 'REVIEW' },
   { id: 'terminal',    icon: '⬡', label: 'TERM' },
   { id: 'zine',         icon: '📷', label: 'ZINE' },
-  { id: 'music',        icon: '💿', label: 'MUSIC' },
   { id: 'favorites',    icon: '❤️', label: 'FAVES' },
 ];
 
@@ -85,10 +84,6 @@ const finderDataJson = JSON.stringify(finderData);
       <div class="os-icon" data-win-id="zine" role="button" tabindex="0" aria-label="Open ZINE">
         <div class="os-icon__img">📷</div>
         <div class="os-icon__label">ZINE</div>
-      </div>
-      <div class="os-icon" data-win-id="music" role="button" tabindex="0" aria-label="Open MUSIC">
-        <div class="os-icon__img">💿</div>
-        <div class="os-icon__label">MUSIC</div>
       </div>
       <div class="os-icon" data-win-id="favorites" role="button" tabindex="0" aria-label="Open FAVES">
         <div class="os-icon__img">❤️</div>
@@ -166,18 +161,6 @@ const finderDataJson = JSON.stringify(finderData);
       minWidth: 300,
       minHeight: 240,
       content: () => createPlaceholderContent('📷', 'ZINE', 'Photography collection coming soon.', '/zine'),
-    });
-
-    // Music placeholder
-    wm.register({
-      id: 'music',
-      title: 'Music — CD Player',
-      icon: '💿',
-      width: 400,
-      height: 360,
-      minWidth: 280,
-      minHeight: 240,
-      content: () => createPlaceholderContent('💿', 'CD PLAYER', 'Music player coming soon.', '/music'),
     });
 
     // Favorites placeholder
@@ -350,13 +333,12 @@ const finderDataJson = JSON.stringify(finderData);
                         app === 'daily' ? 'finder-daily' :
                         app === 'review' ? 'finder-review' :
                         app === 'zine' ? 'zine' :
-                        app === 'music' ? 'music' :
                         app === 'faves' ? 'favorites' : null;
           if (winId) {
             wm.open(winId);
             response = `> opened ${app}`;
           } else {
-            response = `> unknown app: ${app}. try: tech, daily, review, zine, music, faves`;
+            response = `> unknown app: ${app}. try: tech, daily, review, zine, faves`;
           }
           break;
         case trimmed === 'exit':

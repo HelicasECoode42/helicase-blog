@@ -2,5 +2,8 @@ export default {
   avatar: '/images/avatar.svg',
   name: 'HELICASE',
   bio: '一张无边线索画布',
-  socials: [{ label: 'github', url: 'https://github.com/HelicasE' }],
+  socials: [
+    { label: 'github', url: 'https://github.com/HelicasECoode42' },
+    { label: 'email', url: 'mailto:hello@helicase.xin' },
+  ],
 };

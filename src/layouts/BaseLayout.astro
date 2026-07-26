@@ -69,9 +69,6 @@ const socialImage = new URL(image, Astro.site ?? 'https://helicase.pages.dev');
       </div>
     </nav>
 
-    <!-- Survives client-side navigation so homepage audio does not restart. -->
-    <audio id="home-audio-element" preload="metadata" transition:persist="site-audio"></audio>
-
     <!-- Entry Loading overlay -->
     <slot name="entry-overlay" />
 

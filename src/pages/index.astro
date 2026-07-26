@@ -7,7 +7,6 @@ import BackgroundDebris from '../components/BackgroundDebris.astro';
 import Profile from '../components/modules/Profile.astro';
 import TimeRing from '../components/modules/TimeRing.astro';
 import ArticleCluster from '../components/modules/ArticleCluster.astro';
-import CDPlayer from '../components/modules/CDPlayer.astro';
 import PhotoZineEntry from '../components/modules/PhotoZineEntry.astro';
 import projects from '../data/projects';
 import activities from '../data/activities';
@@ -69,15 +68,12 @@ const catEntries = await Promise.all(
             <a class="latest-log" href="/now"><small>LATEST</small>{activities[0]?.title}</a>
           </section>
         </div>
-        <div class="content-cdp">
-          <CDPlayer />
-        </div>
       </div>
     </section>
 
     <!-- ── Interests ──────────────────────── -->
     <section class="footer-row">
-      <a class="interests-entry" href="/interests"><span>INTERESTS</span><strong>music · favorites · zine · mood</strong><em>explore →</em></a>
+      <a class="interests-entry" href="/interests"><span>INTERESTS</span><strong>favorites · zine · mood</strong><em>explore →</em></a>
       <div class="footer-entries">
         <a href="/mood" class="footer-entry-link">[ mood → ]</a>
         <a href="/links" class="footer-entry-link">[ links → ]</a>

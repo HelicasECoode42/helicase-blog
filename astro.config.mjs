@@ -22,10 +22,7 @@ export default defineConfig({
   vite: {
     ssr: {
       // Client-only libs — skip SSR bundling
-      external: ['cal-heatmap', 'masonry-layout', 'three'],
-    },
-    optimizeDeps: {
-      exclude: ['three'],
+      external: ['cal-heatmap', 'masonry-layout'],
     },
   },
 });

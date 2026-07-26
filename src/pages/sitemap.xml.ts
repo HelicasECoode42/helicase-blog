@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
 
-const publicRoutes = ['/', '/about', '/blog', '/favorites', '/inspiration', '/interests', '/links', '/mood', '/music', '/now', '/oc', '/projects', '/zine'];
+const publicRoutes = ['/', '/about', '/blog', '/favorites', '/inspiration', '/interests', '/links', '/mood', '/now', '/oc', '/projects', '/zine'];
 
 export const GET: APIRoute = async ({ site }) => {
   const base = site ?? new URL('https://helicase.pages.dev');

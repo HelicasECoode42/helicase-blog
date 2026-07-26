@@ -117,7 +117,7 @@ npm run dev:worker
 - Studio 使用本机 `127.0.0.1:4317` API 和 `.helicase/studio-state.json`；捕获内容只有在批准并运行相应发布脚本后才可能进入公开数据。
 - `publish:profile` 会拒绝超长字段、不安全协议和异常结构；社交链接必须是 HTTPS，头像必须是 HTTPS 或 `/images/...` 站内路径。
 - 每次发布前运行 `npm run check:worker`。定期运行 `npm audit`；当前低危告警属于开发工具依赖，破坏性升级应在单独迁移分支处理。
-- Three.js 仅在 `/music` 空闲时动态加载。它会产生约 500KB 以上的延迟 chunk，但不会阻塞其他页面首屏，这是有意的性能权衡。
+- 音乐页及其播放器已移除；兴趣区目前聚焦收藏、Zine 与 Moodboard。
 - Cloudflare Workers、Zero Trust、域名、DNS 和 Secrets 属于外部账号配置；本地代码无法证明它们已经正确启用，上线前需在 Cloudflare 控制台单独核验。
 
 ### 环境变量
