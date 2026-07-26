@@ -100,7 +100,13 @@ Cloudflare Workers Builds：
 
 `wrangler.toml` 使用 Worker + Static Assets：只有 `/api/*` 进入 `worker/index.ts`，其他路由直接读取 `dist`。`public/_headers` 已包含 CSP、HSTS、点击劫持防护、MIME 嗅探防护、Referrer Policy 与 Permissions Policy。不要提交 `.env`、`.dev.vars`、模型 API Key、Obsidian Vault 或 `.helicase/studio-state.json`。
 
-OC 对话已经由 `/api/oc-chat` Worker 代理，并限制方法、请求体、消息数量、单条长度、总长度与上游超时。上线前仍应加入 Turnstile、限流和预算保护；完成这些保护前不要配置生产 `DEEPSEEK_API_KEY`。
+OC 对话已经由 `/api/oc-chat` Worker 代理，并限制方法、请求体、消息数量、单条长度、总长度与上游超时。
+
+### D1、Turnstile 与审核
+
+公开互动使用名为 `DB` 的 Cloudflare D1 binding。先创建 D1 数据库，在 `wrangler.toml` 中添加对应 `[[d1_databases]]` 的 `database_id`，再执行 `wrangler d1 migrations apply <database-name> --remote` 应用 `migrations/0001_public_space.sql`。
+
+在 Turnstile 为 `helicase.xin` 建立 widget：将 Secret 设为 Worker Secret `TURNSTILE_SECRET_KEY`，将 Site Key 设为 Cloudflare Builds 的 `PUBLIC_TURNSTILE_SITE_KEY`。Secret 存在时，OC 和评论会强制校验 Turnstile。D1 同时执行 OC 每 IP 10 次/小时、每日预算（`OC_DAILY_LIMIT`，默认 100）、评论每 IP 5 次/小时；评论先进入 `pending`，只能由 `/studio` 审核公开。
 
 完整 Worker 打包检查：
 
@@ -117,7 +123,7 @@ npm run dev:worker
 ## 数据边界与维护
 
 - Markdown 文章和 `src/data/` 是公开站点的构建期数据；修改后必须重新构建和部署。
-- Editor 草稿、收藏、情绪板、Zine、播放器和 OS 布局使用 `localStorage`，只存在当前浏览器，不会跨设备同步、自动备份或自动公开。清理站点数据会丢失这些内容。
+- Editor 草稿和 OS 布局使用 `localStorage`，只存在当前浏览器。Favorites、Moodboard、Zine 和评论已迁移到 D1；D1 尚未配置时这些公开区会显示为空而不会回退到访客浏览器数据。
 - Studio 使用本机 `127.0.0.1:4317` API 和 `.helicase/studio-state.json`；捕获内容只有在批准并运行相应发布脚本后才可能进入公开数据。
 - `publish:profile` 会拒绝超长字段、不安全协议和异常结构；社交链接必须是 HTTPS，头像必须是 HTTPS 或 `/images/...` 站内路径。
 - 每次发布前运行 `npm run check:worker`。定期运行 `npm audit`；当前低危告警属于开发工具依赖，破坏性升级应在单独迁移分支处理。

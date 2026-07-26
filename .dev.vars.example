@@ -1,3 +1,6 @@
 # Copy this file to .dev.vars for local Worker development.
 # Never commit the copied file or a real secret.
 DEEPSEEK_API_KEY=replace_with_your_local_secret
+TURNSTILE_SECRET_KEY=replace_with_turnstile_secret
+RATE_LIMIT_SALT=replace_with_a_long_random_string
+OC_DAILY_LIMIT=100

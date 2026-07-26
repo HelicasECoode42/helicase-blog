@@ -337,7 +337,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 </style>
 
 <script>
-  const STORE = 'helicase-favorites';
   const TYPE_LABELS: Record<number, string> = { 1:'书籍', 2:'动画', 3:'音乐', 4:'游戏', 6:'电影' };
 
   interface FavItem {
@@ -346,13 +345,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     rating: number; note: string; addedAt: string;
   }
 
-  function load(): FavItem[] {
-    try { const r = localStorage.getItem(STORE); return r ? JSON.parse(r) : []; }
-    catch { return []; }
-  }
-  function save(items: FavItem[]) { localStorage.setItem(STORE, JSON.stringify(items)); }
-
-  let favs = load();
+  let favs: FavItem[] = [];
+  // Public page is deliberately read-only. Owner changes go through Studio/D1.
+  function save(_items: FavItem[]) {}
   let activeFilter = 'all';
   let activeSort = 'time';
   let searchCache = new Map<number, any>();
@@ -627,12 +622,20 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   });
 
   // Init
-  renderGrid();
+  async function loadPublicFavorites() {
+    try {
+      const response = await fetch('/api/content/favorites');
+      if (!response.ok) throw new Error('storage unavailable');
+      const data = await response.json() as { items: Array<FavItem & { createdAt?: string }> };
+      favs = data.items.map(item => ({ ...item, addedAt: item.createdAt || new Date().toISOString() }));
+    } catch { favs = []; }
+    renderGrid();
+  }
+  loadPublicFavorites();
 
   // Re-render on View Transition navigation back to this page
   document.addEventListener('astro:after-swap', () => {
-    favs = load();
-    if (document.getElementById('fav-grid')) renderGrid();
+    if (document.getElementById('fav-grid')) loadPublicFavorites();
   });
 
   function esc(s: string) {

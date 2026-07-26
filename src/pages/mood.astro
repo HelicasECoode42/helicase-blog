@@ -49,45 +49,22 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 </style>
 
 <script>
-  const STORE = 'helicase-moodboard';
   const grid = document.getElementById('mood-grid')!;
-  const addUrl = document.getElementById('mood-add-url') as HTMLInputElement;
-  const addSave = document.getElementById('mood-add-save')!;
+  type MoodItem = { id: string; image: string; alt?: string };
 
-  function load(): string[] {
-    try { const r = localStorage.getItem(STORE); return r ? JSON.parse(r) : []; }
-    catch { return []; }
-  }
-  function save(u: string[]) { localStorage.setItem(STORE, JSON.stringify(u)); }
-
-  function render() {
-    const urls = load();
-    if (!urls.length) { grid.innerHTML = '<div class="mood-empty">no images yet — paste a URL above</div>'; return; }
-    grid.innerHTML = urls.map((url, i) => `
+  async function render() {
+    try {
+      const res = await fetch('/api/content/mood');
+      if (!res.ok) throw new Error();
+      const { items } = await res.json() as { items: MoodItem[] };
+      if (!items.length) { grid.innerHTML = '<div class="mood-empty">no images yet</div>'; return; }
+      grid.innerHTML = items.map(item => `
       <div class="mood-img">
-        <img src="${url.replace(/"/g,'&quot;')}" alt="" loading="lazy" />
-        <button class="mood-img-del" data-idx="${i}" tabindex="-1" aria-hidden="true">×</button>
+        <img src="${item.image.replace(/"/g,'&quot;')}" alt="${(item.alt || '').replace(/"/g,'&quot;')}" loading="lazy" />
       </div>
-    `).join('');
-    grid.querySelectorAll('.mood-img-del').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const urls = load(); urls.splice(parseInt((btn as HTMLElement).dataset.idx!), 1);
-        save(urls); render();
-      });
-    });
+      `).join('');
+    } catch { grid.innerHTML = '<div class="mood-empty">moodboard is waking up…</div>'; }
   }
-
-  function doAdd() {
-    const u = addUrl.value.trim();
-    if (!u) return;
-    const urls = load(); urls.push(u); save(urls); render();
-    addUrl.value = '';
-  }
-
-  addSave.addEventListener('click', doAdd);
-  addUrl.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAdd(); });
-
   render();
   document.addEventListener('astro:after-swap', () => { if (document.getElementById('mood-grid')) render(); });
 </script>

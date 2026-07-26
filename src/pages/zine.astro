@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
 ---
 
 <BaseLayout title="Zine" description="艺廊">
@@ -59,6 +60,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <input type="text" id="commentary-input" placeholder="留下你的感受…" maxlength="200" />
           <button id="commentary-send">send</button>
         </div>
+        {turnstileSiteKey && <div id="comment-turnstile" data-sitekey={turnstileSiteKey}></div>}
       </div>
     </div>
   </div>

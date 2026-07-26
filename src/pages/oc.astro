@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
 ---
 <BaseLayout title="OC" description="HELICASE 空间的虚拟接待者">
   <main class="oc">
@@ -36,6 +37,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           />
           <button type="submit" id="oc-send" aria-label="发送">→</button>
         </form>
+        {turnstileSiteKey && <div id="oc-turnstile" class="turnstile" data-sitekey={turnstileSiteKey}></div>}
       </div>
     </section>
   </main>
@@ -50,6 +52,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   // Conversation history for context
   const history: Array<{ role: string; content: string }> = [];
   let busy = false;
+  let turnstileToken = '';
+  const turnstile = document.getElementById('oc-turnstile') as HTMLElement | null;
+  if (turnstile) {
+    const script = document.createElement('script');
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; script.async = true;
+    script.onload = () => (window as any).turnstile?.render(turnstile, { sitekey: turnstile.dataset.sitekey, callback: (token: string) => { turnstileToken = token; }, 'expired-callback': () => { turnstileToken = ''; } });
+    document.head.appendChild(script);
+  }
 
   function addMsg(text: string, who: 'user' | 'ai' | 'system') {
     const div = document.createElement('div');
@@ -78,7 +88,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       const res = await fetch('/api/oc-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: history, turnstileToken }),
       });
 
       const data = await res.json();
@@ -90,6 +100,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         loadingEl.textContent = data.reply;
         history.push({ role: 'assistant', content: data.reply });
       }
+      if (turnstile && (window as any).turnstile) { (window as any).turnstile.reset(); turnstileToken = ''; }
     } catch {
       loadingEl.textContent = '网络错误，请稍后再试';
       loadingEl.classList.add('oc-msg--error');
@@ -212,6 +223,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     border-left-color: #c0392b;
     color: #c0392b;
   }
+  .turnstile { margin-top: 10px; min-height: 65px; }
 
   /* ── Preset prompts ────────────── */
   .oc-prompts {
