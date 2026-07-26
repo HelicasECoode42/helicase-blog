@@ -60,8 +60,8 @@ const categories = siteConfig.categories;
         </div>
         <div class="fm-field">
           <label class="fm-label">
-            <input type="checkbox" id="fm-draft" class="fm-checkbox" checked />
-            draft
+            <input type="checkbox" id="fm-draft" class="fm-checkbox" />
+            keep as draft (not public)
           </label>
         </div>
       </div>
@@ -573,7 +573,7 @@ const categories = siteConfig.categories;
     fmCategory.value = draft.category || 'tech';
     fmTags.value = draft.tags || '';
     fmSummary.value = draft.summary || '';
-    fmDraft.checked = draft.draft !== false;
+    fmDraft.checked = draft.draft === true;
     editor.value = draft.body || '';
   }
 
@@ -807,7 +807,7 @@ const categories = siteConfig.categories;
       });
       var result = await res.json();
       if (!res.ok) throw new Error(result.error || 'publish failed');
-      fmStatus.textContent = 'published: ' + result.path;
+      fmStatus.textContent = fmDraft.checked ? 'saved as draft: ' + result.path : 'published: ' + result.path;
       fmStatus.classList.add('complete');
       sbSave.textContent = 'published';
     } catch (error) {
@@ -826,7 +826,7 @@ const categories = siteConfig.categories;
     fmCategory.value = 'tech';
     fmTags.value = '';
     fmSummary.value = '';
-    fmDraft.checked = true;
+    fmDraft.checked = false;
     editor.value = '';
     saveDraft();
     renderPreview();

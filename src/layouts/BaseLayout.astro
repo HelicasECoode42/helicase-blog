@@ -140,5 +140,20 @@ const socialImage = new URL(image, Astro.site ?? 'https://helicase.pages.dev');
     }
     document.addEventListener('astro:page-load', markLocalAuthor);
     markLocalAuthor();
+
+    // ClientRouter swaps page DOM. Keep the homepage clock independent from a
+    // component script so returning to `/` always rehydrates a live display.
+    function refreshHomeClock() {
+      document.querySelectorAll('#home-live-clock').forEach(function (node) {
+        node.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      });
+    }
+    function startHomeClock() {
+      refreshHomeClock();
+      if (window.__helicaseHomeClock) clearInterval(window.__helicaseHomeClock);
+      window.__helicaseHomeClock = setInterval(refreshHomeClock, 1000);
+    }
+    document.addEventListener('astro:page-load', startHomeClock);
+    startHomeClock();
   })();
 </script>

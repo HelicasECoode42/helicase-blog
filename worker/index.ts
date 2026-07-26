@@ -71,6 +71,29 @@ async function publishArticle(request: Request, env: AuthEnv): Promise<Response>
   return response.ok ? json(200, { ok: true, path }) : json(502, { error: 'GitHub publish failed' });
 }
 
+async function adminArticles(request: Request, env: AuthEnv): Promise<Response> {
+  if (request.method !== 'GET') return json(405, { error: 'Method not allowed' });
+  if (!env.GITHUB_CONTENT_TOKEN || !env.GITHUB_OWNER || !env.GITHUB_REPO) return json(503, { error: 'GitHub publishing is not configured' });
+  const headers = { Accept: 'application/vnd.github+json', Authorization: `Bearer ${env.GITHUB_CONTENT_TOKEN}`, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'HELICASE-Studio' };
+  const root = `https://api.github.com/repos/${encodeURIComponent(env.GITHUB_OWNER)}/${encodeURIComponent(env.GITHUB_REPO)}`;
+  try {
+    const treeResponse = await fetch(`${root}/git/trees/main?recursive=1`, { headers });
+    if (!treeResponse.ok) return json(502, { error: 'Could not list GitHub articles' });
+    const tree = await treeResponse.json() as { tree?: Array<{ path?: string; type?: string }> };
+    const paths = (tree.tree || []).map(item => item.path || '').filter(path => /^src\/content\/blog\/(tech|daily|reviews)\/[^/]+\.md$/.test(path)).sort().reverse().slice(0, 100);
+    const articles = await Promise.all(paths.map(async path => {
+      const response = await fetch(`${root}/contents/${path}`, { headers });
+      if (!response.ok) return { path, title: path.split('/').pop(), draft: null };
+      const file = await response.json() as { content?: string };
+      const text = file.content ? new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\n/g, '')), ch => ch.charCodeAt(0))) : '';
+      const title = text.match(/^title:\s*["']?(.+?)["']?\s*$/m)?.[1] || path.split('/').pop();
+      const date = text.match(/^date:\s*(.+)\s*$/m)?.[1] || '';
+      return { path, title, date, draft: /^draft:\s*true\s*$/m.test(text), category: path.split('/')[3] };
+    }));
+    return json(200, { items: articles });
+  } catch { return json(502, { error: 'Could not inspect GitHub articles' }); }
+}
+
 function validateContent(kindName: ContentKind, payload: unknown): Record<string, unknown> | null {
   if (!payload || typeof payload !== 'object') return null; const p = payload as Record<string, unknown>;
   if (kindName === 'favorites') { const bgmId = Number(p.bgmId); const cover = validUrl(p.cover); if (!Number.isInteger(bgmId) || bgmId < 1 || !cover) return null; return { bgmId, name: safeText(p.name, 120), name_cn: safeText(p.name_cn, 120), cover, type: Math.max(0, Math.min(99, Number(p.type) || 0)), typeLabel: safeText(p.typeLabel, 16), rating: Math.max(0, Math.min(10, Number(p.rating) || 0)), note: safeText(p.note, 500) }; }
@@ -125,6 +148,7 @@ export default { async fetch(request: Request, env: AuthEnv): Promise<Response> 
   if (pathname === '/api/comments') return publicComments(request, env);
   const adminMatch = pathname.match(/^\/api\/admin\/content\/(favorites|mood|zine)(?:\/([A-Za-z0-9_-]{8,64}))?$/); if (adminMatch) return adminContent(request, env, adminMatch[1] as ContentKind, adminMatch[2]);
   if (pathname === '/api/admin/comments') return adminComments(request, env);
+  if (pathname === '/api/admin/articles') return adminArticles(request, env);
   const siteMatch = pathname.match(/^\/api\/admin\/site\/(profile|links|projects)$/); if (siteMatch) return adminSite(request, env, siteMatch[1]);
   if (pathname.startsWith('/api/')) return json(404, { error: 'Not found' }); return env.ASSETS.fetch(request);
 } };
