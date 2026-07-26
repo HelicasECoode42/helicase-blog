@@ -2,6 +2,10 @@ name = "helicase-blog"
 main = "worker/index.ts"
 compatibility_date = "2026-07-15"
 
+routes = [
+  { pattern = "helicase.xin", custom_domain = true }
+]
+
 [[d1_databases]]
 binding = "DB"
 database_name = "helicase-blog-data"
