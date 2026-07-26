@@ -1,5 +1,5 @@
 export default {
-  avatar: '/images/avatar.svg',
+  avatar: '/images/avatar.jpg',
   name: 'HELICASE',
   bio: '一张无边线索画布',
   socials: [
