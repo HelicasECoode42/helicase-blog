@@ -15,6 +15,7 @@ const text = (value, label, max) => {
 };
 const safeUrl = (value, label, { allowLocal = false } = {}) => {
   const normalized = text(value, label, 500);
+  if (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(normalized)) return normalized;
   if (allowLocal && /^\/images\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]+$/.test(normalized)) return normalized;
   let parsed;
   try { parsed = new URL(normalized); } catch { throw new Error(`${label} must be an https URL${allowLocal ? ' or /images/... path' : ''}.`); }
