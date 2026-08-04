@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1000 620">
+  <rect width="1000" height="620" fill="#eef1f3"/>
+  <path d="M0 80H1000M0 160H1000M0 240H1000M0 320H1000M0 400H1000M0 480H1000M0 560H1000" stroke="#dbe1e5"/>
+  <text x="50" y="52" fill="#243746" font-family="sans-serif" font-size="24" font-weight="600">TDAI 记忆系统｜长期记忆召回</text>
+  <text x="50" y="92" fill="#72808a" font-family="sans-serif" font-size="15">逐层抽象，但始终保留回到原始证据的路径</text>
+  <g font-family="sans-serif">
+    <rect x="50" y="180" width="190" height="100" rx="4" fill="#d7e0e5" stroke="#607783"/>
+    <text x="72" y="218" fill="#243746" font-size="20">L0 原始对话</text><text x="72" y="250" fill="#72808a" font-size="14">对话与证据</text>
+    <rect x="290" y="125" width="190" height="100" rx="4" fill="#d7e0e5" stroke="#607783"/>
+    <text x="312" y="163" fill="#243746" font-size="20">L1 原子记忆</text><text x="312" y="195" fill="#72808a" font-size="14">事实与事件</text>
+    <rect x="290" y="265" width="190" height="100" rx="4" fill="#c8d5dc" stroke="#607783"/>
+    <text x="312" y="303" fill="#243746" font-size="20">L2 场景记忆</text><text x="312" y="335" fill="#72808a" font-size="14">按场景组织</text>
+    <rect x="290" y="405" width="190" height="100" rx="4" fill="#b8cbd4" stroke="#607783"/>
+    <text x="312" y="443" fill="#243746" font-size="20">L3 用户画像</text><text x="312" y="475" fill="#72808a" font-size="14">稳定偏好与模式</text>
+    <rect x="570" y="205" width="190" height="150" rx="4" fill="#f7f8f8" stroke="#607783"/>
+    <text x="598" y="245" fill="#243746" font-size="19">检索</text><text x="598" y="280" fill="#526975" font-size="15">BM25</text><text x="598" y="307" fill="#526975" font-size="15">向量检索</text><text x="598" y="334" fill="#526975" font-size="15">RRF 融合</text>
+    <rect x="830" y="205" width="120" height="150" rx="4" fill="#243746" stroke="#9fb2bc"/>
+    <text x="855" y="250" fill="#eef1f3" font-size="18">召回</text><text x="853" y="288" fill="#c8d5dc" font-size="14">送入</text><text x="853" y="315" fill="#c8d5dc" font-size="14">下一轮</text><text x="853" y="342" fill="#c8d5dc" font-size="14">Prompt</text>
+  </g>
+  <g stroke="#526975" stroke-width="3" fill="none"><path d="M240 230H290"/><path d="M385 225V265"/><path d="M385 365V405"/><path d="M480 315H570"/><path d="M760 280H830"/></g>
+  <g fill="#526975"><path d="M282 230l-12-7v14z"/><path d="M385 255l-7-12h14z"/><path d="M385 395l-7-12h14z"/><path d="M560 315l-12-7v14z"/><path d="M820 280l-12-7v14z"/></g>
+  <text x="50" y="575" fill="#72808a" font-family="sans-serif" font-size="14">低层保留证据｜高层保留结构｜召回时按需下钻</text>
+</svg>

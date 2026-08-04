@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 1000 570">
+  <rect width="1000" height="570" fill="#eef1f3"/>
+  <path d="M0 90H1000M0 180H1000M0 270H1000M0 360H1000M0 450H1000" stroke="#dbe1e5"/>
+  <text x="50" y="55" fill="#243746" font-family="sans-serif" font-size="24" font-weight="600">Prompt Cache｜两个 Epoch</text>
+  <g font-family="sans-serif">
+    <rect x="50" y="135" width="430" height="175" rx="4" fill="#d7e0e5" stroke="#607783"/><text x="82" y="180" fill="#243746" font-size="20">稳定缓存 Epoch</text><text x="82" y="225" fill="#526975" font-size="16">Persona + Scenario 快照</text><text x="82" y="258" fill="#72808a" font-size="14">内容不变时保持相同字节</text><text x="82" y="287" fill="#72808a" font-size="14">显式发布后切换 Epoch</text>
+    <rect x="520" y="135" width="430" height="175" rx="4" fill="#243746" stroke="#9fb2bc"/><text x="552" y="180" fill="#eef1f3" font-size="20">记忆事件 Ledger</text><text x="552" y="225" fill="#c8d5dc" font-size="16">正文只注册一次</text><text x="552" y="258" fill="#9fb2bc" font-size="14">每轮只追加 Focus ID</text><text x="552" y="287" fill="#9fb2bc" font-size="14">超出 Token 预算后封口</text>
+    <rect x="50" y="390" width="900" height="82" rx="4" fill="#f7f8f8" stroke="#607783"/><text x="78" y="425" fill="#243746" font-size="16">第 1 轮：注册 A、B + 聚焦 A、B</text><text x="410" y="425" fill="#72808a" font-size="16">→</text><text x="450" y="425" fill="#243746" font-size="16">第 2 轮：聚焦 C</text><text x="680" y="425" fill="#72808a" font-size="16">→</text><text x="720" y="425" fill="#243746" font-size="16">第 3 轮：重新聚焦 A</text>
+    <rect x="50" y="500" width="900" height="32" rx="3" fill="#c8d5dc"/><text x="68" y="522" fill="#243746" font-family="sans-serif" font-size="14">压缩后：重建当前工作集，避免 transcript 无限增长</text>
+  </g>
+  <path d="M265 310V390M735 310V390" stroke="#526975" stroke-width="3" stroke-dasharray="8 8"/>
+</svg>
