@@ -1,9 +1,18 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import activities from '../data/activities';
 import projects from '../data/projects';
 import externalActivities from '../data/external-activities';
-const visible = [...activities.filter(a => a.visibility === 'public'), ...externalActivities].sort((a,b) => b.date.localeCompare(a.date));
+const publishedPosts = (await getCollection('blog', ({ data }) => !data.draft)).map(post => ({
+  date: post.data.date.toISOString().slice(0, 10),
+  type: 'writing',
+  title: `发布《${post.data.title}》`,
+  source: 'blog',
+}));
+const visible = [...activities.filter(a => a.visibility === 'public'), ...publishedPosts, ...externalActivities]
+  .filter((item, index, all) => all.findIndex(candidate => candidate.date === item.date && candidate.type === item.type && candidate.title === item.title) === index)
+  .sort((a,b) => b.date.localeCompare(a.date));
 const counts = new Map<string, number>();
 visible.forEach(a => counts.set(a.date, (counts.get(a.date) || 0) + ('count' in a ? Math.max(1, Number(a.count)) : 1)));
 const today = new Date(); today.setHours(0,0,0,0);

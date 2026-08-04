@@ -14,6 +14,15 @@ const publicProjects = projects.filter(p => p.visibility === 'public');
           <div class="meter" aria-label={`项目进度 ${project.progress}%`}><span style={`width:${project.progress}%`}></span></div>
           <dl><div><dt>NOW</dt><dd>{project.current}</dd></div><div><dt>NEXT</dt><dd>{project.next}</dd></div></dl>
           <div class="stack">{project.stack.map(item => <span>{item}</span>)}</div>
+          {(project.notes?.length || project.noteHint) && (
+            <details class="project-notes">
+              <summary>NOTES / NAVIGATE</summary>
+              <div class="project-notes-body">
+                {project.notes?.map(note => <a href={note.url}>{note.label} →</a>)}
+                {project.noteHint && <span>{project.noteHint}</span>}
+              </div>
+            </details>
+          )}
           <time>updated {project.updatedAt}</time>
         </article>
       ))}
@@ -22,6 +31,9 @@ const publicProjects = projects.filter(p => p.visibility === 'public');
 </BaseLayout>
 <style>
   .work-page{max-width:900px;margin:auto;padding:56px 24px 100px}.back{font:12px var(--font-mono);color:var(--color-silver)}header{margin:48px 0 36px}.eyebrow,.status,dt,time,.stack{font-family:var(--font-mono)}.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--color-blue);margin-bottom:10px}h1{font:700 1rem/1 var(--font-mono);letter-spacing:.2em;color:var(--color-deep-blue)}.project-list{display:grid;gap:28px}.project{border-top:1px solid var(--color-silver-light);padding-top:22px}.project-head{display:flex;justify-content:space-between;align-items:start}.project-head h2{font:600 1.7rem var(--font-body);margin-top:6px}.project-head strong{font:500 2.5rem var(--font-mono);color:var(--color-silver-light)}.status{font-size:10px;color:var(--color-blue);letter-spacing:.12em}.summary{max-width:650px;line-height:1.7;margin:18px 0}.meter{height:2px;background:var(--color-silver-light);margin:20px 0}.meter span{height:100%;display:block;background:var(--color-blue)}dl{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin:26px 0}dt{font-size:9px;letter-spacing:.15em;color:var(--color-silver)}dd{font-size:.9rem;line-height:1.6;margin-top:7px}.stack{display:flex;gap:8px;flex-wrap:wrap}.stack span{font-size:10px;border:1px solid var(--color-silver-light);padding:4px 7px}time{display:block;font-size:9px;color:var(--color-silver);margin-top:20px}@media(max-width:600px){dl{grid-template-columns:1fr}.work-page{padding:40px 16px 80px}}
+</style>
+<style>
+  .project-notes{margin-top:22px;border-top:1px solid var(--color-silver-light);padding-top:12px}.project-notes summary{cursor:pointer;list-style:none;font:10px var(--font-mono);letter-spacing:.12em;color:var(--color-blue)}.project-notes summary::-webkit-details-marker{display:none}.project-notes summary::before{content:'＋ ';color:var(--color-silver)}.project-notes[open] summary::before{content:'－ ';}.project-notes-body{display:flex;flex-wrap:wrap;gap:10px 18px;padding:14px 0 2px}.project-notes-body a,.project-notes-body span{font:12px var(--font-mono);color:var(--color-silver)}.project-notes-body a:hover{color:var(--color-blue)}
 </style>
 <style>
   .work-page{padding-top:34px}
