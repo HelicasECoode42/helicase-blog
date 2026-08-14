@@ -45,6 +45,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           />
           <button type="submit" id="oc-send" aria-label="发送">→</button>
         </form>
+        <div id="oc-turnstile-status" class="oc-turnstile-status" aria-live="polite">正在准备安全验证…</div>
         <div id="oc-turnstile" class="turnstile" hidden></div>
       </div>
     </section>
@@ -56,27 +57,90 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   const form = document.getElementById('oc-form')! as HTMLFormElement;
   const input = document.getElementById('oc-text')! as HTMLInputElement;
   const sendBtn = document.getElementById('oc-send')! as HTMLButtonElement;
+  const promptButtons = Array.from(document.querySelectorAll('.oc-prompts button')) as HTMLButtonElement[];
+  const turnstileStatus = document.getElementById('oc-turnstile-status') as HTMLElement | null;
 
   // Conversation history for context
   const history: Array<{ role: string; content: string }> = [];
   let busy = false;
   let turnstileToken = '';
+  let turnstileReady = false;
+  let turnstileWidgetId: string | number | null = null;
   const turnstile = document.getElementById('oc-turnstile') as HTMLElement | null;
+
+  function setTurnstileStatus(message: string, visible = true) {
+    if (!turnstileStatus) return;
+    turnstileStatus.textContent = message;
+    turnstileStatus.hidden = !visible;
+  }
+
+  function updateControls() {
+    const disabled = busy || !turnstileReady;
+    sendBtn.disabled = disabled;
+    promptButtons.forEach((button) => { button.disabled = disabled; });
+  }
+
+  function markTurnstileUnavailable(message = '安全验证暂时不可用，请刷新页面后重试。') {
+    turnstileReady = false;
+    turnstileToken = '';
+    setTurnstileStatus(message);
+    updateControls();
+  }
+
+  function resetTurnstile() {
+    const api = (window as any).turnstile;
+    if (api && turnstileWidgetId !== null) api.reset(turnstileWidgetId);
+    turnstileReady = false;
+    turnstileToken = '';
+    setTurnstileStatus('正在准备下一次安全验证…');
+    updateControls();
+  }
+
   async function setupTurnstile() {
-    if (!turnstile) return;
+    if (!turnstile) {
+      markTurnstileUnavailable();
+      return;
+    }
     try {
       const response = await fetch('/api/oc-config');
       const config = await response.json() as { sitekey?: unknown };
       const sitekey = String(config.sitekey || '').trim();
-      if (!response.ok || !sitekey) return;
+      if (!response.ok || !sitekey) {
+        markTurnstileUnavailable();
+        return;
+      }
       turnstile.dataset.sitekey = sitekey;
       turnstile.hidden = false;
       const script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; script.async = true;
-      script.onload = () => (window as any).turnstile?.render(turnstile, { sitekey, callback: (token: string) => { turnstileToken = token; }, 'expired-callback': () => { turnstileToken = ''; } });
+      script.onload = () => {
+        const api = (window as any).turnstile;
+        if (!api?.render) {
+          markTurnstileUnavailable();
+          return;
+        }
+        turnstileWidgetId = api.render(turnstile, {
+          sitekey,
+          callback: (token: string) => {
+            turnstileToken = token;
+            turnstileReady = Boolean(token);
+            setTurnstileStatus('', false);
+            updateControls();
+          },
+          'expired-callback': () => {
+            turnstileReady = false;
+            turnstileToken = '';
+            setTurnstileStatus('安全验证已过期，请重新验证。');
+            updateControls();
+          },
+          'error-callback': () => markTurnstileUnavailable('安全验证加载失败，请刷新页面后重试。'),
+        });
+      };
+      script.onerror = () => markTurnstileUnavailable('安全验证加载失败，请检查网络后重试。');
       document.head.appendChild(script);
-    } catch { /* The API will return a clear verification error if setup is unavailable. */ }
+    } catch { markTurnstileUnavailable(); }
   }
+  updateControls();
   setupTurnstile();
 
   function addMsg(text: string, who: 'user' | 'ai' | 'system') {
@@ -105,8 +169,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   async function askQuestion(question: string) {
     if (busy || !question.trim()) return;
+    if (!turnstileToken || !turnstileReady) {
+      setTurnstileStatus('安全验证还在准备中，请稍等一下再发送。');
+      input.focus();
+      return;
+    }
     busy = true;
-    sendBtn.disabled = true;
+    updateControls();
 
     // Clear system hint on first message
     const sysHint = chat.querySelector('.oc-msg--system');
@@ -133,14 +202,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         loadingEl.textContent = data.reply;
         history.push({ role: 'assistant', content: data.reply });
       }
-      if (turnstile && (window as any).turnstile) { (window as any).turnstile.reset(); turnstileToken = ''; }
     } catch {
       loadingEl.textContent = '网络错误，请稍后再试';
       loadingEl.classList.add('oc-msg--error');
+    } finally {
+      resetTurnstile();
     }
 
     busy = false;
-    sendBtn.disabled = false;
+    updateControls();
     input.value = '';
     input.focus();
   }
@@ -152,7 +222,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   });
 
   // Preset prompt buttons
-  document.querySelectorAll('.oc-prompts button').forEach((btn) => {
+  promptButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       const q = (btn as HTMLButtonElement).dataset.q || '';
       askQuestion(q);
@@ -220,8 +290,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
   /* ── Chat area ─────────────────── */
   .oc-chat {
-    max-height: 320px;
+    height: 320px;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
     margin: 20px 0 16px;
     display: flex;
     flex-direction: column;
@@ -265,6 +337,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   .oc-msg--error {
     border-left-color: #c0392b;
     color: #c0392b;
+  }
+  .turnstile-status {
+    margin-top: 8px;
+    font: 10px var(--font-mono);
+    color: var(--color-silver);
   }
   .turnstile { margin-top: 10px; min-height: 65px; }
 
@@ -349,6 +426,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       margin-top: 40px;
     }
     .portrait { height: 240px; }
+    .oc-chat { height: 300px; }
     .oc-map { flex-wrap: wrap; }
     .oc-map span { flex-basis: 100%; }
   }
