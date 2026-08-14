@@ -196,6 +196,14 @@ try {
     body: JSON.stringify({ target: 'smoke-zine', author: 'smoke', body: 'must not bypass Turnstile' }),
   });
   assert(productionBypass.status === 403, `Turnstile bypass escaped localhost restriction (${productionBypass.status}).`);
+  const unicodeTarget = encodeURIComponent('daily-2026-08-12-做过和学会之间');
+  const unicodeComments = await api(base, `/api/comments?kind=blog&target=${unicodeTarget}`, {}, false);
+  assert(unicodeComments.status === 200 && Array.isArray(unicodeComments.data.items), 'Unicode article comment targets must be readable.');
+  const unicodeComment = await api(base, '/api/comments', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Host: 'helicase.xin' },
+    body: JSON.stringify({ kind: 'zine', target: 'daily-2026-08-12-做过和学会之间', body: 'must pass target validation' }),
+  }, false);
+  assert(unicodeComment.status === 403, `Unicode article comment target was rejected before Turnstile (${unicodeComment.status}).`);
 
   const legacyProjects = [{
     id: 'legacy-project', name: 'Legacy project', type: 'personal product', status: 'forming', progress: 58,

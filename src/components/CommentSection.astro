@@ -72,7 +72,7 @@ const { target } = Astro.props;
         session.replaceChildren();
         if (auth.user) {
           const identity = document.createElement('span'); identity.className = 'comments__identity';
-          const avatar = document.createElement('img'); avatar.src = auth.user.avatarUrl; avatar.alt = ''; const text = document.createElement('span'); text.textContent = `以 @${auth.user.login} 评论`;
+          const avatar = document.createElement('img'); avatar.className = 'comments__identity-avatar'; avatar.src = auth.user.avatarUrl; avatar.alt = ''; const text = document.createElement('span'); text.textContent = `以 @${auth.user.login} 评论`;
           const logout = document.createElement('a'); logout.href = `/api/auth/logout?returnTo=${encodeURIComponent(location.pathname)}`; logout.textContent = '退出';
           identity.append(avatar, text); session.append(identity, logout); form.hidden = false;
         } else {
@@ -107,8 +107,8 @@ const { target } = Astro.props;
   .comments__session { min-height: 48px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--color-silver-light); font: .72rem/1.4 var(--font-mono); color: var(--color-silver); }
   .comments__session a { color: var(--color-blue); }
   .comments__login { padding: 7px 10px; border: 1px solid var(--color-blue); text-decoration: none; }
-  .comments__identity { display: flex; align-items: center; gap: 8px; color: var(--color-deep-blue); }
-  .comments__identity img { width: 26px; height: 26px; border-radius: 50%; }
+  :global(.comments__identity) { display: flex; align-items: center; gap: 8px; color: var(--color-deep-blue); min-width: 0; }
+  :global(.comments__identity-avatar) { width: 24px; height: 24px; flex: 0 0 24px; object-fit: cover; border-radius: 50%; }
   .comments__form { margin-top: 16px; }
   .comments__form label { display: block; margin-bottom: 8px; font: .68rem/1 var(--font-mono); color: var(--color-silver); }
   .comments__form textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid var(--color-silver-light); border-radius: 0; background: transparent; color: var(--color-black); font: .9rem/1.65 var(--font-body); }

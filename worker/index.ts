@@ -33,6 +33,7 @@ interface SiteSettingRow {
 
 const apiHeaders = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
 const idPattern = /^[A-Za-z0-9_-]{8,64}$/;
+const commentTargetPattern = /^[\p{L}\p{N}_/-]{1,160}$/u;
 function json(status: number, body: Record<string, unknown>): Response { return new Response(JSON.stringify(body), { status, headers: apiHeaders }); }
 function isProtectedPath(pathname: string): boolean { return pathname === '/studio' || pathname.startsWith('/studio/') || pathname === '/editor' || pathname.startsWith('/editor/'); }
 function unauthorized(): Response { return new Response('Authentication required', { status: 401, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'WWW-Authenticate': 'Basic realm="HELICASE Studio", charset="UTF-8"', 'Cache-Control': 'no-store' } }); }
@@ -218,9 +219,9 @@ async function adminContent(request: Request, env: AuthEnv, kindName: ContentKin
 async function publicComments(request: Request, env: AuthEnv): Promise<Response> {
   const db = database(env); if (!db) return json(503, { error: 'Comment storage is not configured' }); const url = new URL(request.url);
   const targetKind = url.searchParams.get('kind') === 'blog' ? 'blog' : 'zine';
-  if (request.method === 'GET') { const target = safeText(url.searchParams.get('target'), 160); if (!/^[A-Za-z0-9/_-]{1,160}$/.test(target)) return json(400, { error: 'Invalid target' }); const rows = await db.prepare("SELECT id, author, body, avatar_url, author_url, created_at FROM comments WHERE target_kind = ? AND target_id = ? AND status = 'approved' ORDER BY created_at ASC").bind(targetKind, target).all(); return json(200, { items: rows.results }); }
+  if (request.method === 'GET') { const target = safeText(url.searchParams.get('target'), 160); if (!commentTargetPattern.test(target)) return json(400, { error: 'Invalid target' }); const rows = await db.prepare("SELECT id, author, body, avatar_url, author_url, created_at FROM comments WHERE target_kind = ? AND target_id = ? AND status = 'approved' ORDER BY created_at ASC").bind(targetKind, target).all(); return json(200, { items: rows.results }); }
   if (request.method !== 'POST') return json(405, { error: 'Method not allowed' }); let body: Record<string, unknown>; try { body = await request.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
-  const bodyKind = body.kind === 'blog' ? 'blog' : 'zine', target = safeText(body.target, 160), text = safeText(body.body, 1000); if (!/^[A-Za-z0-9/_-]{1,160}$/.test(target) || !text) return json(400, { error: 'Invalid comment' });
+  const bodyKind = body.kind === 'blog' ? 'blog' : 'zine', target = safeText(body.target, 160), text = safeText(body.body, 1000); if (!commentTargetPattern.test(target) || !text) return json(400, { error: 'Invalid comment' });
   if (!await takeRateLimit(request, env, 'comment', 10, 3600)) return json(429, { error: 'Please try again later' });
   const user = await currentUser(request, env);
   if (bodyKind === 'blog' && !user) return json(401, { error: 'Sign in with GitHub to comment' });
