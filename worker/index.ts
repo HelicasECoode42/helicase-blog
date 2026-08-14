@@ -10,6 +10,7 @@ interface AuthEnv extends WorkerEnv {
   GITHUB_CONTENT_TOKEN?: string; GITHUB_OWNER?: string; GITHUB_REPO?: string;
   DB?: Database;
   TURNSTILE_SECRET_KEY?: string;
+  PUBLIC_TURNSTILE_SITE_KEY?: string;
   ALLOW_INSECURE_TURNSTILE_BYPASS?: string;
   RATE_LIMIT_SALT?: string;
   OC_DAILY_LIMIT?: string;
@@ -407,6 +408,7 @@ async function adminSite(request: Request, env: AuthEnv, name: SiteSettingName):
 export default { async fetch(request: Request, env: AuthEnv): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   if (pathname.startsWith('/api/auth/')) return authApi(request, env, pathname);
+  if (pathname === '/api/oc-config') return json(200, { sitekey: env.PUBLIC_TURNSTILE_SITE_KEY || '' });
   if ((isProtectedPath(pathname) || pathname === '/api/publish' || pathname.startsWith('/api/admin/')) && !authorized(request, env)) return unauthorized();
   if (pathname === '/api/oc-chat') {
     if (!database(env)) return json(503, { error: 'OC protection storage is not configured' }); let body: { turnstileToken?: unknown }; try { body = await request.clone().json(); } catch { return json(400, { error: 'Invalid request body' }); }

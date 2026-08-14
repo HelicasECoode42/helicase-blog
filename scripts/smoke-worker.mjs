@@ -87,6 +87,7 @@ async function startWorker(port, githubPort) {
     '--var', 'GITHUB_OWNER:smoke',
     '--var', 'GITHUB_REPO:smoke',
     '--var', `GITHUB_API_BASE_URL:http://127.0.0.1:${githubPort}`,
+    '--var', 'PUBLIC_TURNSTILE_SITE_KEY:smoke-site-key',
     '--var', 'ALLOW_INSECURE_TURNSTILE_BYPASS:true',
   ];
   const child = spawn(wrangler, args, { cwd: root, env: commandEnvironment(), stdio: ['ignore', 'pipe', 'pipe'] });
@@ -177,6 +178,8 @@ try {
   assert(homeResponse.status === 200 && nowResponse.status === 200 && homeLatest && nowLatest && homeLatest[1] === nowLatest[1] && homeLatest[2] === nowLatest[2], 'Static homepage and /now smoke failed.');
   const buildMeta = await (await fetch(`${base}/build-meta.json`)).json();
   assert(/^[a-f0-9]{40}$/i.test(buildMeta.commitSha || '') && ['profile', 'links', 'projects'].every(name => /^[a-f0-9]{64}$/i.test(buildMeta.contentHashes?.[name] || '')), 'Build metadata smoke failed.');
+  const ocConfig = await api(base, '/api/oc-config', {}, false);
+  assert(ocConfig.status === 200 && ocConfig.data.sitekey === 'smoke-site-key', 'OC Turnstile runtime config smoke failed.');
   const favorites = await api(base, '/api/content/favorites', {}, false);
   assert(favorites.status === 200 && Array.isArray(favorites.data.items), 'Public D1 content API smoke failed.');
   const unauthorized = await api(base, '/api/admin/site/profile', {}, false);
