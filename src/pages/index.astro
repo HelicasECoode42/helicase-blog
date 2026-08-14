@@ -670,12 +670,12 @@ const supportingProjects = activeProjects.filter(project => project.id !== focus
     .homepage {
       width: min(1240px, 100%);
       max-width: none;
-      min-height: calc(100svh - 36px);
+      height: calc(100svh - 36px);
       padding: 22px 32px 24px;
       gap: 24px;
       display: grid;
-      grid-template-rows: auto auto auto;
-      overflow: visible;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: hidden;
     }
     .hero { padding-top: 0; }
 
@@ -687,10 +687,10 @@ const supportingProjects = activeProjects.filter(project => project.id !== focus
 
     /* The middle row fills the viewport; columns stretch, and their content
        absorbs the slack: the featured panel grows, the writing list fills. */
-    .portfolio-grid { align-items: start; gap: 48px; padding-top: 15px; }
-    .work-column { display: flex; flex-direction: column; }
+    .portfolio-grid { min-height: 0; align-items: stretch; gap: 48px; padding-top: 15px; }
+    .work-column { min-height: 0; display: flex; flex-direction: column; }
     .featured-work { flex: 1; }
-    .writings-column { display: flex; flex-direction: column; }
+    .writings-column { min-height: 0; display: flex; flex-direction: column; }
     .writing-list { flex: 1; display: flex; flex-direction: column; }
     .writing-list li { flex: 1; display: flex; }
     .writing-list li > a { flex: 1; align-items: center; }
