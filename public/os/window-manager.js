@@ -4,7 +4,9 @@
 // drag, focus, z-index, and localStorage persistence.
 // ============================================
 
-const LAYOUT_KEY = 'helicase-desktop-layout';
+// v2 resets the prototype's old top-left geometry while preserving it for
+// anyone who wants to inspect the previous layout manually.
+const LAYOUT_KEY = 'helicase-desktop-layout-v2';
 const MAX_Z = 9999;
 
 export class WindowManager {
@@ -69,10 +71,12 @@ export class WindowManager {
     const saved = this._loadLayout();
     const fromSave = saved[id];
     const cascade = this.wins.size * 24;
-    const x = desc.x ?? (fromSave?.x ?? 80 + cascade);
-    const y = desc.y ?? (fromSave?.y ?? 60 + cascade);
     const w = fromSave?.w ?? desc.width;
     const h = fromSave?.h ?? desc.height;
+    const defaultX = desc.center ? Math.max(24, Math.round((window.innerWidth - w) / 2)) : 80 + cascade;
+    const defaultY = desc.center ? Math.max(44, Math.round((window.innerHeight - h) / 2) - 20) : 60 + cascade;
+    const x = fromSave?.x ?? (desc.x ?? defaultX);
+    const y = fromSave?.y ?? (desc.y ?? defaultY);
 
     const state = {
       id,

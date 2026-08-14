@@ -114,18 +114,16 @@
 </style>
 
 <!-- Re-run after Astro View Transitions when returning to the homepage. -->
-<script data-astro-rerun>
+<script is:inline data-astro-rerun>
+  // View transitions can execute this inline script more than once. Keep every
+  // declaration inside a fresh scope so a return to Canvas never collides with
+  // the previous page instance.
+  (function initTimeRing() {
   const CIRCUM = 2 * Math.PI * 48; // 301.59
 
   function daysInMonth() {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  }
-
-  function dayOfYear() {
-    const d = new Date();
-    const start = new Date(d.getFullYear(), 0, 0);
-    return Math.floor((d.getTime() - start.getTime()) / 86400000);
   }
 
   const dims = [
@@ -211,7 +209,6 @@
     if (transitioning) return;
     transitioning = true;
 
-    const prev = dims[dimIdx];
     dimIdx = (dimIdx + 1) % dims.length;
     const next = dims[dimIdx];
 
@@ -264,5 +261,6 @@
   document.addEventListener('astro:before-swap', () => {
     stopTicking();
     obs.disconnect();
-  });
+  }, { once: true });
+  })();
 </script>

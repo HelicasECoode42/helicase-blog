@@ -1,36 +1,287 @@
 ---
 import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import activities from '../data/activities';
-import projects from '../data/projects';
-import externalActivities from '../data/external-activities';
-const publishedPosts = (await getCollection('blog', ({ data }) => !data.draft)).map(post => ({
-  date: post.data.date.toISOString().slice(0, 10),
-  type: 'writing',
-  title: `发布《${post.data.title}》`,
-  source: 'blog',
-}));
-const visible = [...activities.filter(a => a.visibility === 'public'), ...publishedPosts, ...externalActivities]
-  .filter((item, index, all) => all.findIndex(candidate => candidate.date === item.date && candidate.type === item.type && candidate.title === item.title) === index)
-  .sort((a,b) => b.date.localeCompare(a.date));
-const counts = new Map<string, number>();
-visible.forEach(a => counts.set(a.date, (counts.get(a.date) || 0) + ('count' in a ? Math.max(1, Number(a.count)) : 1)));
-const today = new Date(); today.setHours(0,0,0,0);
-const start = new Date(today); start.setDate(today.getDate() - 364 - today.getDay());
-const days = Array.from({length: 371}, (_, i) => { const d = new Date(start); d.setDate(start.getDate()+i); const key=d.toISOString().slice(0,10); return {key,count:counts.get(key)||0}; });
+import SignalInstrument from '../components/modules/SignalInstrument.astro';
+import projects from '../data/projects.json';
+import { buildActivityFeed, buildHeatmapDays, countActivitiesByDay, shanghaiDateKey } from '../lib/activity-feed';
+import { getProjectActivity } from '../lib/project-activity';
+
+const publishedPosts = await getCollection('blog', ({ data }) => !data.draft);
+const visible = buildActivityFeed(publishedPosts);
+const { days, activeDays } = buildHeatmapDays(visible);
+const activeProjects = projects.filter(project => project.status === 'active' && project.visibility === 'public');
+const focusProject = activeProjects.find(project => project.id === 'echoforge') || activeProjects[0];
+const secondaryProjects = activeProjects.filter(project => project.id !== focusProject?.id);
+const activityCounts = countActivitiesByDay(visible);
+const todayKey = shanghaiDateKey(new Date());
+const today = new Date(`${todayKey}T00:00:00Z`);
+const signalDays = Array.from({ length: 7 }, (_, index) => {
+  const date = new Date(today);
+  date.setUTCDate(today.getUTCDate() - 6 + index);
+  const key = date.toISOString().slice(0, 10);
+  return { date: key, label: key.slice(8), count: activityCounts.get(key) || 0 };
+});
+const sourceCounts = visible.reduce((counts, item) => {
+  const source = item.source === 'blog' ? 'blog' : item.source?.includes('github') ? 'github' : 'manual';
+  counts[source] += 1;
+  return counts;
+}, { manual: 0, blog: 0, github: 0 });
 ---
+
 <BaseLayout title="Now" description="最近在做什么、学习什么，以及真实的成长痕迹">
-  <main class="now-page">
-    <h1 class="sr-only">NOW</h1>
-    <section class="active"><h2>ACTIVE</h2>{projects.filter(p=>p.status==='active'&&p.visibility==='public').map(p=><a href={`/projects#${p.id}`}><strong>{p.name}</strong><span>{p.current}</span><em>next: {p.next}</em></a>)}</section>
-    <section class="heat"><div class="section-head"><h2>365 DAYS</h2><span>{visible.length} recorded activities</span></div><div class="heat-scroll"><div class="heat-grid" role="img" aria-label="过去一年的网站活动热力图">{days.map(d=><span class:list={['cell',`level-${Math.min(4,d.count)}`]} title={`${d.key}: ${d.count} activities`}></span>)}</div></div><div class="legend"><span>less</span>{[0,1,2,3,4].map(n=><i class={`level-${n}`}></i>)}<span>more</span></div></section>
-    <section class="timeline"><h2>RECENT LOG</h2>{visible.slice(0,12).map(item=><article><time>{item.date}</time><span class="type">{item.type}</span><p>{item.title}</p></article>)}</section>
+  <main class="now-page" data-ark-theme="exa" data-ark-depth="moderate" data-ark-mode="activity-field">
+    <header class="now-header">
+      <span>PUBLIC ACTIVITY / SHANGHAI</span>
+      <h1>NOW</h1>
+    </header>
+
+    <nav class="now-tabs" role="tablist" aria-label="Now sections">
+      <button type="button" role="tab" id="now-tab-activity" aria-controls="now-panel-activity" aria-selected="true" data-now-tab="activity"><span>01</span> ACTIVITY FIELD</button>
+      <button type="button" role="tab" id="now-tab-work" aria-controls="now-panel-work" aria-selected="false" tabindex="-1" data-now-tab="work"><span>02</span> ACTIVE WORK</button>
+      <button type="button" role="tab" id="now-tab-log" aria-controls="now-panel-log" aria-selected="false" tabindex="-1" data-now-tab="log"><span>03</span> RECENT LOG</button>
+    </nav>
+
+    <div class="now-panels">
+    <section class="activity-zone" id="now-panel-activity" role="tabpanel" aria-labelledby="now-tab-activity" data-now-panel="activity">
+      <div class="section-title">
+        <div><span>01 / PUBLIC EVIDENCE</span><h2 id="activity-heading">ACTIVITY FIELD</h2></div>
+        <span>{activeDays} ACTIVE DAYS / 365</span>
+      </div>
+
+      {focusProject && (
+        <div class="activity-instrument">
+          <SignalInstrument
+            days={signalDays}
+            focus={{ name: focusProject.name, phase: focusProject.phase, current: focusProject.current, href: `/projects/${focusProject.id}` }}
+            latest={visible[0] ? { date: visible[0].date, title: visible[0].title } : null}
+            activeProjects={activeProjects.length}
+            archiveSize={visible.length}
+          />
+        </div>
+      )}
+
+      <div class="heat-panel">
+        <div class="heat-scroll">
+          <div class="heat-grid" role="img" aria-label="过去一年的网站活动热力图">
+            {days.map(day => <span class:list={['cell', `level-${Math.min(4, day.count)}`]} title={`${day.key}: ${day.count} activities`}></span>)}
+          </div>
+        </div>
+        <div class="legend"><span>LESS</span>{[0, 1, 2, 3, 4].map(level => <i class={`level-${level}`}></i>)}<span>MORE</span></div>
+      </div>
+
+      <div class="activity-summary" aria-label="activity source summary">
+        <div><strong>{String(sourceCounts.github).padStart(2, '0')}</strong><span>GITHUB</span></div>
+        <div><strong>{String(sourceCounts.blog).padStart(2, '0')}</strong><span>WRITINGS</span></div>
+        <div><strong>{String(sourceCounts.manual).padStart(2, '0')}</strong><span>MANUAL</span></div>
+      </div>
+    </section>
+
+    <section class="focus-zone" id="now-panel-work" role="tabpanel" aria-labelledby="now-tab-work" data-now-panel="work" hidden>
+      <div class="section-title">
+        <div><span>02 / CURRENT FOCUS</span><h2 id="focus-heading">ACTIVE WORK</h2></div>
+        <a href="/projects">PROJECT ARCHIVE →</a>
+      </div>
+
+      {focusProject && (() => { const activity = getProjectActivity(focusProject); return (
+        <a class="focus-card" href={`/projects/${focusProject.id}`}>
+          <div class="focus-index" aria-hidden="true">01</div>
+          <span class="focus-state">PRIMARY · {focusProject.phase}</span>
+          <h3>{focusProject.name}</h3>
+          <dl>
+            <div><dt>CURRENT</dt><dd>{focusProject.current}</dd></div>
+            <div><dt>NEXT</dt><dd>{focusProject.next}</dd></div>
+          </dl>
+          {activity.lastActivityDate && (
+            <em data-project-activity={JSON.stringify(activity.activitySeries)}>
+              last {activity.lastActivityDate} · <output data-project-days="7">{activity.last7Days}</output> actions / 7d
+            </em>
+          )}
+        </a>
+      )})()}
+
+      <div class="secondary-grid">
+        {secondaryProjects.map((project, index) => { const activity = getProjectActivity(project); return (
+          <a href={`/projects/${project.id}`}>
+            <span>{String(index + 2).padStart(2, '0')} · {project.phase}</span>
+            <strong>{project.name}</strong>
+            <p>{project.current}</p>
+            {activity.lastActivityDate
+              ? <em data-project-activity={JSON.stringify(activity.activitySeries)}><output data-project-days="7">{activity.last7Days}</output> / 7d</em>
+              : <em>NO PUBLIC REPO</em>}
+          </a>
+        )})}
+      </div>
+    </section>
+
+    <section class="timeline" id="now-panel-log" role="tabpanel" aria-labelledby="now-tab-log" data-now-panel="log" hidden data-manual-count={sourceCounts.manual} data-blog-count={sourceCounts.blog} data-github-count={sourceCounts.github}>
+      <div class="section-title">
+        <div><span>03 / LATEST FIVE</span><h2 id="recent-heading">RECENT LOG</h2></div>
+        <span>NEWEST FIRST</span>
+      </div>
+      <div class="log-list">
+        {visible.slice(0, 5).map((item, index) => (
+          <article data-activity-date={item.date} data-activity-title={item.title} data-time-precision={item.timePrecision || 'day'}>
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <time>{item.date}</time>
+            <em>{item.type}</em>
+            <p>{item.title}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+    </div>
   </main>
+
+  <script>
+    function setupNowTabs() {
+      const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-now-tab]'));
+      const panels = Array.from(document.querySelectorAll<HTMLElement>('[data-now-panel]'));
+      if (!tabs.length || tabs[0].dataset.ready === 'true') return;
+      tabs[0].dataset.ready = 'true';
+
+      function selectTab(tab: HTMLButtonElement, moveFocus = false) {
+        const id = tab.dataset.nowTab;
+        for (const candidate of tabs) {
+          const active = candidate === tab;
+          candidate.setAttribute('aria-selected', String(active));
+          candidate.tabIndex = active ? 0 : -1;
+        }
+        for (const panel of panels) {
+          const active = panel.dataset.nowPanel === id;
+          panel.hidden = !active;
+          if (active) {
+            panel.classList.remove('is-entering');
+            void panel.offsetWidth;
+            panel.classList.add('is-entering');
+            panel.addEventListener('animationend', () => panel.classList.remove('is-entering'), { once: true });
+          }
+        }
+        if (moveFocus) tab.focus();
+      }
+
+      for (const tab of tabs) {
+        tab.addEventListener('click', () => selectTab(tab));
+        tab.addEventListener('keydown', event => {
+          if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          const current = tabs.indexOf(tab);
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : event.key === 'ArrowRight' ? (current + 1) % tabs.length : (current - 1 + tabs.length) % tabs.length;
+          selectTab(tabs[next], true);
+        });
+      }
+    }
+    document.addEventListener('astro:page-load', setupNowTabs);
+    setupNowTabs();
+  </script>
 </BaseLayout>
-<style>
-  .now-page{max-width:960px;margin:auto;padding:56px 24px 100px}.back{font:12px var(--font-mono);color:var(--color-silver)}header{margin:48px 0 36px}header p,h2,.type,time,.section-head span,.legend{font-family:var(--font-mono)}header p{font-size:11px;letter-spacing:.18em;color:var(--color-blue)}h1{font:700 1rem/1 var(--font-mono);letter-spacing:.2em;color:var(--color-deep-blue);margin:10px 0}section{margin-top:54px}h2{font-size:10px;letter-spacing:.16em;color:var(--color-blue)}.active a{display:grid;grid-template-columns:150px 1fr 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--color-silver-light)}.active span,.active em{font-size:.82rem;line-height:1.5}.active em{color:var(--color-silver);font-style:normal}.section-head{display:flex;justify-content:space-between;margin-bottom:18px}.section-head span{font-size:10px;color:var(--color-silver)}.heat-scroll{overflow-x:auto;padding-bottom:8px}.heat-grid{display:grid;grid-template-rows:repeat(7,10px);grid-auto-flow:column;grid-auto-columns:10px;gap:3px;width:max-content}.cell,.legend i{background:#e7e9ee}.level-1{background:#b8c4fa!important}.level-2{background:#7d91ed!important}.level-3{background:#4e68dc!important}.level-4{background:#243fb9!important}.legend{display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:9px;color:var(--color-silver);margin-top:8px}.legend i{width:9px;height:9px}.timeline article{display:grid;grid-template-columns:100px 90px 1fr;gap:15px;padding:12px 0;border-bottom:1px solid var(--color-silver-light)}time,.type{font-size:10px;color:var(--color-silver)}.type{color:var(--color-blue)}.timeline p{font-size:.9rem}@media(max-width:600px){.now-page{padding:40px 16px}.active a{grid-template-columns:1fr}.timeline article{grid-template-columns:80px 1fr}.timeline p{grid-column:1/-1}}
-</style>
-<style>
-  .now-page{padding-top:34px}.active{margin-top:0}
-  @media(max-width:600px){.now-page{padding-top:28px}}
+
+<style is:global>
+  .now-page { width: min(1180px, 100%); height: calc(100svh - 36px); margin: 0 auto; padding: 22px 32px 24px; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 16px; overflow: hidden; }
+  .now-header { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding: 8px 0 15px; border-bottom: 1px solid var(--color-deep-blue); }
+  .now-header span,
+  .section-title,
+  .focus-state,
+  .now-page dt,
+  .focus-card em,
+  .secondary-grid,
+  .activity-summary,
+  .legend,
+  .timeline article { font-family: var(--font-mono); }
+  .now-header span { font-size: .62rem; letter-spacing: .16em; color: var(--color-blue); }
+  .now-header h1 { order: -1; font: 700 clamp(1.7rem, 3.4vw, 2.65rem)/.9 var(--font-mono); letter-spacing: -.045em; color: var(--color-deep-blue); }
+
+  .now-tabs { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--color-silver-light); border-bottom: 1px solid var(--color-silver-light); font-family: var(--font-mono); }
+  .now-tabs button { min-height: 42px; padding: 8px 14px; border: 0; border-right: 1px solid var(--color-silver-light); background: transparent; font: 600 .62rem/1 var(--font-mono); letter-spacing: .1em; color: var(--color-silver); cursor: pointer; text-align: left; transition: color 220ms ease, background-color 220ms ease, box-shadow 220ms var(--ease-mechanical); }
+  .now-tabs button:last-child { border-right: 0; }
+  .now-tabs button span { margin-right: 10px; color: var(--color-silver-light); }
+  .now-tabs button:hover,
+  .now-tabs button[aria-selected="true"] { color: var(--color-blue); background: color-mix(in srgb, var(--color-blue) 3%, transparent); }
+  .now-tabs button[aria-selected="true"] { box-shadow: inset 0 -3px var(--color-blue); }
+  .now-tabs button[aria-selected="true"] span { color: var(--color-blue); }
+
+  .now-panels { min-height: 0; }
+  .now-panels > section { height: 100%; min-height: 0; margin: 0; padding-top: 4px; }
+  .now-panels > section[hidden] { display: none; }
+  .now-panels > section.is-entering { animation: now-panel-enter 280ms var(--ease-mechanical) both; }
+
+  .activity-instrument { margin: 0 0 13px; }
+  .activity-instrument .signal-instrument { width: 100%; padding-top: 0; }
+  .section-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 18px; padding-bottom: 9px; border-bottom: 1px solid var(--color-silver-light); }
+  .section-title div > span { display: block; margin-bottom: 6px; font-size: .62rem; letter-spacing: .14em; color: var(--color-silver); }
+  .section-title h2 { font: 650 .76rem/1 var(--font-mono); letter-spacing: .16em; color: var(--color-blue); }
+  .section-title > a,
+  .section-title > span { font-size: .62rem; letter-spacing: .08em; color: var(--color-silver); }
+  .section-title > a:hover { color: var(--color-blue); }
+
+  .focus-card { position: relative; display: block; min-height: 255px; padding: 24px 31% 24px 30px; overflow: hidden; border-left: 3px solid var(--color-blue); background: linear-gradient(120deg, color-mix(in srgb, var(--color-blue) 5%, transparent), transparent 62%); }
+  .focus-index { position: absolute; right: 22px; top: 7px; font: 500 9rem/.9 var(--font-mono); color: color-mix(in srgb, var(--color-blue) 8%, transparent); }
+  .focus-state { position: relative; font-size: .62rem; letter-spacing: .15em; color: var(--color-blue); }
+  .focus-card h3 { position: relative; margin-top: 26px; font: 650 clamp(1.8rem, 4.2vw, 3rem)/1 var(--font-body); color: var(--color-deep-blue); }
+  .focus-card dl { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 27px; }
+  .focus-card dt { font-size: .6rem; letter-spacing: .14em; color: var(--color-silver); }
+  .focus-card dd { margin-top: 7px; font-size: .7rem; line-height: 1.55; }
+  .focus-card > em { position: absolute; right: 26px; bottom: 22px; font-size: .62rem; font-style: normal; color: var(--color-silver); }
+  .focus-card:hover h3 { color: var(--color-blue); }
+
+  .secondary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 1px; gap: 1px; background: var(--color-silver-light); }
+  .secondary-grid a { position: relative; min-height: 135px; padding: 16px 18px; background: var(--color-canvas); }
+  .secondary-grid span,
+  .secondary-grid em { font-size: .6rem; letter-spacing: .09em; color: var(--color-silver); font-style: normal; }
+  .secondary-grid span { color: var(--color-blue); }
+  .secondary-grid strong { display: block; margin-top: 16px; font: 600 .9rem/1.1 var(--font-body); }
+  .secondary-grid p { margin-top: 9px; font: .72rem/1.55 var(--font-body); color: var(--color-text-secondary); }
+  .secondary-grid em { position: absolute; right: 15px; bottom: 14px; }
+  .secondary-grid a:hover strong { color: var(--color-blue); }
+
+  .heat-panel { padding: 20px 20px 13px; border-left: 1px solid var(--color-blue); background: color-mix(in srgb, var(--color-blue) 2.5%, transparent); }
+  .heat-scroll { overflow-x: auto; padding-bottom: 8px; }
+  .heat-grid { display: grid; grid-template-rows: repeat(7, 10px); grid-auto-flow: column; grid-auto-columns: 10px; gap: 3px; width: max-content; min-width: 100%; }
+  .cell,
+  .legend i { background: #e7e9ee; }
+  .level-1 { background: #b8c4fa !important; }
+  .level-2 { background: #7d91ed !important; }
+  .level-3 { background: #4e68dc !important; }
+  .level-4 { background: #243fb9 !important; }
+  .legend { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 7px; font-size: .6rem; color: var(--color-silver); }
+  .legend i { width: 9px; height: 9px; }
+  .activity-summary { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 1px; border-top: 1px solid var(--color-silver-light); border-bottom: 1px solid var(--color-silver-light); }
+  .activity-summary div { display: flex; align-items: baseline; gap: 8px; padding: 11px 13px; border-right: 1px solid var(--color-silver-light); }
+  .activity-summary div:last-child { border-right: 0; }
+  .activity-summary strong { font: 500 1.1rem/1 Georgia, var(--font-body); color: var(--color-blue); }
+  .activity-summary span { font-size: .6rem; letter-spacing: .1em; color: var(--color-silver); }
+
+  .log-list { margin: 0; padding: 0; }
+  .timeline article { display: grid; grid-template-columns: 28px 80px 95px minmax(0, 1fr); gap: 16px; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--color-silver-light); }
+  .timeline article > span { font-size: .62rem; color: var(--color-blue); }
+  .timeline time,
+  .timeline em { font-size: .62rem; color: var(--color-silver); font-style: normal; }
+  .timeline em { color: var(--color-blue); text-transform: uppercase; }
+  .timeline p { overflow: hidden; font: .74rem/1.45 var(--font-body); white-space: nowrap; text-overflow: ellipsis; }
+
+  @keyframes now-panel-enter {
+    from { clip-path: inset(0 0 7% 0); transform: translateY(9px); opacity: .3; }
+    to { clip-path: inset(0); transform: translateY(0); opacity: 1; }
+  }
+
+  @media (max-width: 720px) {
+    .now-page { height: auto; min-height: calc(100svh - 36px); padding: 24px 16px 64px; overflow: visible; }
+    .now-header { align-items: center; }
+    .now-tabs { overflow-x: auto; grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+    .now-panels > section { min-height: 560px; }
+    .focus-card { min-height: 330px; padding: 24px 22px; }
+    .focus-card dl { grid-template-columns: 1fr; gap: 18px; }
+    .focus-card > em { left: 22px; right: auto; }
+    .secondary-grid { grid-template-columns: 1fr; }
+    .timeline article { grid-template-columns: 24px 74px minmax(0, 1fr); gap: 10px; }
+    .timeline article em { display: none; }
+  }
+
+  @media (min-width: 721px) and (max-width: 980px) {
+    .secondary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .now-tabs button { transition: none; }
+    .now-panels > section.is-entering { animation: none; }
+  }
 </style>

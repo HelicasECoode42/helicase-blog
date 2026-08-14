@@ -1,5 +1,6 @@
-import { defineCollection, z } from 'astro:content';
+import { defineCollection } from 'astro:content';
 import { glob } from 'astro/loaders';
+import { z } from 'astro/zod';
 import siteConfig from './data/site-config.json';
 
 const categoryKeys = siteConfig.categories.map(c => c.key) as [string, ...string[]];

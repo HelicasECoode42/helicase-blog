@@ -4,7 +4,7 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
 ---
 
 <BaseLayout title="Zine" description="艺廊">
-  <div class="zine-page">
+  <div class="zine-page" data-ark-theme="exa" data-ark-depth="moderate" data-ark-mode="gallery">
     <h1 class="sr-only">ZINE</h1>
     <!-- Gallery wall -->
     <div class="gallery-wall" id="zine-wall"></div>
@@ -12,7 +12,7 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
     <!-- Empty state -->
     <div class="gallery-empty" id="zine-empty">
       <p class="gallery-empty-icon">🖼</p>
-      <p>drop an image url or select a file</p>
+      <p>暂无公开作品</p>
         <div class="gallery-empty-actions owner-only" aria-hidden="true">
         <input type="text" id="zine-url-inp" placeholder="https://…" />
         <button id="zine-url-add">paste</button>

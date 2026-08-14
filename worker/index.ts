@@ -1,6 +1,7 @@
 import { handleOcChat, type WorkerEnv } from './oc-chat';
 
 type ContentKind = 'favorites' | 'mood' | 'zine';
+type SiteSettingName = 'profile' | 'links' | 'projects';
 type D1Result<T> = { results: T[] };
 interface Statement { bind(...values: unknown[]): Statement; first<T>(): Promise<T | null>; all<T>(): Promise<D1Result<T>>; run(): Promise<unknown>; }
 interface Database { prepare(query: string): Statement; }
@@ -9,12 +10,28 @@ interface AuthEnv extends WorkerEnv {
   GITHUB_CONTENT_TOKEN?: string; GITHUB_OWNER?: string; GITHUB_REPO?: string;
   DB?: Database;
   TURNSTILE_SECRET_KEY?: string;
+  ALLOW_INSECURE_TURNSTILE_BYPASS?: string;
   RATE_LIMIT_SALT?: string;
   OC_DAILY_LIMIT?: string;
+  GITHUB_OAUTH_CLIENT_ID?: string;
+  GITHUB_OAUTH_CLIENT_SECRET?: string;
+  SESSION_SECRET?: string;
+  GITHUB_API_BASE_URL?: string;
+}
+
+interface GitHubUser { id: number; login: string; avatar_url: string; html_url: string; }
+interface SessionUser { id: number; login: string; avatarUrl: string; profileUrl: string; exp: number; }
+interface SiteSettingRow {
+  payload: string;
+  revision: number;
+  draft_hash: string | null;
+  updated_at: string;
+  published_hash: string | null;
+  published_commit_sha: string | null;
+  published_at: string | null;
 }
 
 const apiHeaders = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
-const contentKinds = new Set<ContentKind>(['favorites', 'mood', 'zine']);
 const idPattern = /^[A-Za-z0-9_-]{8,64}$/;
 function json(status: number, body: Record<string, unknown>): Response { return new Response(JSON.stringify(body), { status, headers: apiHeaders }); }
 function isProtectedPath(pathname: string): boolean { return pathname === '/studio' || pathname.startsWith('/studio/') || pathname === '/editor' || pathname.startsWith('/editor/'); }
@@ -26,10 +43,90 @@ function authorized(request: Request, env: AuthEnv): boolean {
 }
 function base64Utf8(value: string): string { const bytes = new TextEncoder().encode(value); let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte); return btoa(binary); }
 function database(env: AuthEnv): Database | null { return env.DB ?? null; }
-function kind(value: string): ContentKind | null { return contentKinds.has(value as ContentKind) ? value as ContentKind : null; }
 function newId(): string { return crypto.randomUUID().replace(/-/g, ''); }
 function safeText(value: unknown, max: number): string { return String(value ?? '').trim().replace(/[\u0000-\u001f]/g, ' ').slice(0, max); }
 function validUrl(value: unknown): string | null { try { const url = new URL(String(value)); return ['https:', 'http:'].includes(url.protocol) ? url.href : null; } catch { return null; } }
+function validSiteUrl(value: unknown, allowLocal = false): string | null {
+  const text = String(value || '').trim();
+  if (allowLocal && /^\/?(?:[A-Za-z0-9._~!$&'()*+,;=:@%/-]+)?$/.test(text) && text.startsWith('/')) return text;
+  if (/^mailto:[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(text)) return text;
+  return validUrl(text);
+}
+async function sha256Text(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+function cookie(request: Request, name: string): string | null {
+  const match = request.headers.get('Cookie')?.split(';').map(part => part.trim()).find(part => part.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
+function base64Url(bytes: Uint8Array): string {
+  let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeBase64Url(value: string): Uint8Array {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  return Uint8Array.from(atob(normalized), character => character.charCodeAt(0));
+}
+async function signature(value: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return base64Url(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value))));
+}
+async function signedValue(payload: object, secret: string): Promise<string> {
+  const encoded = base64Url(new TextEncoder().encode(JSON.stringify(payload)));
+  return `${encoded}.${await signature(encoded, secret)}`;
+}
+async function verifySignedValue<T>(value: string | null, secret: string): Promise<T | null> {
+  if (!value) return null; const [payload, supplied, extra] = value.split('.'); if (!payload || !supplied || extra) return null;
+  const expected = await signature(payload, secret); if (expected.length !== supplied.length) return null;
+  let mismatch = 0; for (let index = 0; index < expected.length; index++) mismatch |= expected.charCodeAt(index) ^ supplied.charCodeAt(index);
+  if (mismatch) return null;
+  try { return JSON.parse(new TextDecoder().decode(decodeBase64Url(payload))) as T; } catch { return null; }
+}
+async function currentUser(request: Request, env: AuthEnv): Promise<SessionUser | null> {
+  if (!env.SESSION_SECRET) return null;
+  const user = await verifySignedValue<SessionUser>(cookie(request, 'helicase_session'), env.SESSION_SECRET);
+  return user && Number.isInteger(user.id) && user.exp > Date.now() ? user : null;
+}
+function safeReturnTo(value: unknown, origin: string): string {
+  try {
+    const resolved = new URL(String(value || '/'), origin);
+    if (resolved.origin !== origin) return '/';
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`.slice(0, 500) || '/';
+  } catch { return '/'; }
+}
+function redirect(location: string, cookies: string[] = []): Response {
+  const headers = new Headers({ Location: location, 'Cache-Control': 'no-store' }); for (const value of cookies) headers.append('Set-Cookie', value);
+  return new Response(null, { status: 302, headers });
+}
+async function githubLogin(request: Request, env: AuthEnv): Promise<Response> {
+  if (!env.GITHUB_OAUTH_CLIENT_ID || !env.SESSION_SECRET) return json(503, { error: 'GitHub login is not configured' });
+  const url = new URL(request.url); const state = crypto.randomUUID(); const returnTo = safeReturnTo(url.searchParams.get('returnTo'), url.origin);
+  const stateCookie = await signedValue({ state, returnTo, exp: Date.now() + 10 * 60_000 }, env.SESSION_SECRET);
+  const authorize = new URL('https://github.com/login/oauth/authorize'); authorize.searchParams.set('client_id', env.GITHUB_OAUTH_CLIENT_ID); authorize.searchParams.set('redirect_uri', `${url.origin}/api/auth/github/callback`); authorize.searchParams.set('state', state); authorize.searchParams.set('scope', 'read:user');
+  return redirect(authorize.href, [`helicase_oauth=${encodeURIComponent(stateCookie)}; Path=/api/auth/github/callback; HttpOnly; Secure; SameSite=Lax; Max-Age=600`]);
+}
+async function githubCallback(request: Request, env: AuthEnv): Promise<Response> {
+  const url = new URL(request.url); const clearState = 'helicase_oauth=; Path=/api/auth/github/callback; HttpOnly; Secure; SameSite=Lax; Max-Age=0';
+  if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.SESSION_SECRET) return redirect('/?login=unavailable', [clearState]);
+  const saved = await verifySignedValue<{ state: string; returnTo: string; exp: number }>(cookie(request, 'helicase_oauth'), env.SESSION_SECRET);
+  if (!saved || saved.exp < Date.now() || saved.state !== url.searchParams.get('state') || !url.searchParams.get('code')) return redirect('/?login=failed', [clearState]);
+  try {
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'User-Agent': 'HELICASE-login' }, body: JSON.stringify({ client_id: env.GITHUB_OAUTH_CLIENT_ID, client_secret: env.GITHUB_OAUTH_CLIENT_SECRET, code: url.searchParams.get('code'), redirect_uri: `${url.origin}/api/auth/github/callback` }) });
+    const token = await tokenResponse.json() as { access_token?: string }; if (!tokenResponse.ok || !token.access_token) return redirect(`${saved.returnTo}?login=failed`, [clearState]);
+    const userResponse = await fetch('https://api.github.com/user', { headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token.access_token}`, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'HELICASE-login' } });
+    const github = await userResponse.json() as GitHubUser; if (!userResponse.ok || !github.id || !github.login) return redirect(`${saved.returnTo}?login=failed`, [clearState]);
+    const session = await signedValue({ id: github.id, login: safeText(github.login, 39), avatarUrl: validUrl(github.avatar_url) || '', profileUrl: validUrl(github.html_url) || '', exp: Date.now() + 30 * 24 * 60 * 60_000 }, env.SESSION_SECRET);
+    return redirect(saved.returnTo, [clearState, `helicase_session=${encodeURIComponent(session)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`]);
+  } catch { return redirect(`${saved.returnTo}?login=failed`, [clearState]); }
+}
+async function authApi(request: Request, env: AuthEnv, pathname: string): Promise<Response> {
+  if (pathname === '/api/auth/github') return githubLogin(request, env);
+  if (pathname === '/api/auth/github/callback') return githubCallback(request, env);
+  if (pathname === '/api/auth/me') { const user = await currentUser(request, env); return json(200, { user: user ? { login: user.login, avatarUrl: user.avatarUrl, profileUrl: user.profileUrl } : null }); }
+  if (pathname === '/api/auth/logout') { const url = new URL(request.url); return redirect(safeReturnTo(url.searchParams.get('returnTo'), url.origin), ['helicase_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0']); }
+  return json(404, { error: 'Not found' });
+}
 
 async function subject(request: Request, env: AuthEnv): Promise<string> {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
@@ -51,7 +148,11 @@ async function takeOcBudget(env: AuthEnv): Promise<boolean> {
   return !!row && row.requests <= max;
 }
 async function verifyTurnstile(request: Request, env: AuthEnv, token: unknown): Promise<boolean> {
-  if (!env.TURNSTILE_SECRET_KEY) return true; // local/dev remains usable; production must set this secret.
+  if (!env.TURNSTILE_SECRET_KEY) {
+    const hostname = new URL(request.url).hostname;
+    const local = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+    return local && env.ALLOW_INSECURE_TURNSTILE_BYPASS === 'true';
+  }
   if (!token || typeof token !== 'string' || token.length > 4096) return false;
   const form = new FormData(); form.set('secret', env.TURNSTILE_SECRET_KEY); form.set('response', token);
   const ip = request.headers.get('CF-Connecting-IP'); if (ip) form.set('remoteip', ip);
@@ -116,28 +217,195 @@ async function adminContent(request: Request, env: AuthEnv, kindName: ContentKin
 }
 async function publicComments(request: Request, env: AuthEnv): Promise<Response> {
   const db = database(env); if (!db) return json(503, { error: 'Comment storage is not configured' }); const url = new URL(request.url);
-  if (request.method === 'GET') { const target = url.searchParams.get('target') || ''; if (!idPattern.test(target)) return json(400, { error: 'Invalid target' }); const rows = await db.prepare("SELECT id, author, body, created_at FROM comments WHERE target_kind = 'zine' AND target_id = ? AND status = 'approved' ORDER BY created_at DESC").bind(target).all(); return json(200, { items: rows.results }); }
+  const targetKind = url.searchParams.get('kind') === 'blog' ? 'blog' : 'zine';
+  if (request.method === 'GET') { const target = safeText(url.searchParams.get('target'), 160); if (!/^[A-Za-z0-9/_-]{1,160}$/.test(target)) return json(400, { error: 'Invalid target' }); const rows = await db.prepare("SELECT id, author, body, avatar_url, author_url, created_at FROM comments WHERE target_kind = ? AND target_id = ? AND status = 'approved' ORDER BY created_at ASC").bind(targetKind, target).all(); return json(200, { items: rows.results }); }
   if (request.method !== 'POST') return json(405, { error: 'Method not allowed' }); let body: Record<string, unknown>; try { body = await request.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
-  const target = safeText(body.target, 64), author = safeText(body.author, 24) || 'anonymous', text = safeText(body.body, 400); if (!idPattern.test(target) || !text) return json(400, { error: 'Invalid comment' });
-  if (!await verifyTurnstile(request, env, body.turnstileToken)) return json(403, { error: 'Verification failed' }); if (!await takeRateLimit(request, env, 'comment', 5, 3600)) return json(429, { error: 'Please try again later' });
-  await db.prepare("INSERT INTO comments (id, target_kind, target_id, author, body, status) VALUES (?, 'zine', ?, ?, ?, 'pending')").bind(newId(), target, author, text).run(); return json(202, { ok: true, status: 'pending' });
+  const bodyKind = body.kind === 'blog' ? 'blog' : 'zine', target = safeText(body.target, 160), text = safeText(body.body, 1000); if (!/^[A-Za-z0-9/_-]{1,160}$/.test(target) || !text) return json(400, { error: 'Invalid comment' });
+  if (!await takeRateLimit(request, env, 'comment', 10, 3600)) return json(429, { error: 'Please try again later' });
+  const user = await currentUser(request, env);
+  if (bodyKind === 'blog' && !user) return json(401, { error: 'Sign in with GitHub to comment' });
+  if (!user && !await verifyTurnstile(request, env, body.turnstileToken)) return json(403, { error: 'Verification failed' });
+  const author = user?.login || safeText(body.author, 24) || 'anonymous', status = user ? 'approved' : 'pending';
+  await db.prepare("INSERT INTO comments (id, target_kind, target_id, author, body, status, github_id, avatar_url, author_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(newId(), bodyKind, target, author, text, status, user?.id || null, user?.avatarUrl || null, user?.profileUrl || null).run(); return json(user ? 201 : 202, { ok: true, status });
 }
 async function adminComments(request: Request, env: AuthEnv): Promise<Response> {
   const db = database(env); if (!db) return json(503, { error: 'Comment storage is not configured' }); if (request.method === 'GET') { const rows = await db.prepare("SELECT id, target_id, author, body, status, created_at FROM comments WHERE status = 'pending' ORDER BY created_at ASC LIMIT 100").all(); return json(200, { items: rows.results }); }
   if (request.method !== 'POST') return json(405, { error: 'Method not allowed' }); let body: Record<string, unknown>; try { body = await request.json(); } catch { return json(400, { error: 'Invalid JSON' }); } const id = safeText(body.id, 64), status = body.status === 'approved' ? 'approved' : body.status === 'rejected' ? 'rejected' : ''; if (!idPattern.test(id) || !status) return json(400, { error: 'Invalid moderation action' }); await db.prepare('UPDATE comments SET status = ? WHERE id = ?').bind(status, id).run(); return json(200, { ok: true });
 }
-async function adminSite(request: Request, env: AuthEnv, name: string): Promise<Response> {
+function validateSiteSetting(name: SiteSettingName, input: unknown): unknown | null {
+  const object = input && typeof input === 'object' ? input as Record<string, unknown> : null;
+  if (name === 'profile') {
+    if (!object) return null;
+    const avatar = validSiteUrl(object.avatar, true), profileName = safeText(object.name, 48), bio = safeText(object.bio, 140);
+    const socials = Array.isArray(object.socials) ? object.socials : null;
+    if (!avatar || !profileName || !socials || socials.length > 12) return null;
+    const normalized = socials.map(item => {
+      const social = item && typeof item === 'object' ? item as Record<string, unknown> : null;
+      const label = safeText(social?.label, 32), url = validSiteUrl(social?.url);
+      return label && url ? { label, url } : null;
+    });
+    if (normalized.some(item => !item)) return null;
+    return { avatar, name: profileName, bio, socials: normalized };
+  }
+  if (name === 'links') {
+    if (!Array.isArray(input) || input.length > 100) return null;
+    const links = input.map(item => {
+      const link = item && typeof item === 'object' ? item as Record<string, unknown> : null;
+      const linkName = safeText(link?.name, 80), note = safeText(link?.note, 240), url = validSiteUrl(link?.url);
+      return linkName && url ? { name: linkName, note, url } : null;
+    });
+    return links.some(item => !item) ? null : links;
+  }
+  if (!Array.isArray(input) || input.length > 100) return null;
+  const ids = new Set<string>();
+  const projects = input.map(item => {
+    const project = item && typeof item === 'object' ? item as Record<string, unknown> : null;
+    const id = safeText(project?.id, 64);
+    if (!project || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(id) || ids.has(id)) return null;
+    ids.add(id);
+    const textFields = ['name', 'type', 'summary', 'current', 'next'] as const;
+    const values = Object.fromEntries(textFields.map(field => [field, safeText(project[field], field === 'summary' ? 400 : 180)]));
+    if (textFields.some(field => !values[field])) return null;
+    const rawStatus = safeText(project.status, 20), rawPhase = safeText(project.phase, 20);
+    const status = ['active', 'paused', 'archived'].includes(rawStatus) ? rawStatus : rawStatus === 'forming' ? 'active' : '';
+    const phase = ['exploring', 'building', 'validating', 'maintaining'].includes(rawPhase)
+      ? rawPhase : rawStatus === 'forming' ? 'exploring' : rawPhase ? '' : 'building';
+    if (!status || !phase) return null;
+    const stack = Array.isArray(project.stack) ? project.stack.map(value => safeText(value, 40)).filter(Boolean) : null;
+    const githubRepos = Array.isArray(project.githubRepos) ? project.githubRepos.map(value => safeText(value, 160)).filter(Boolean) : [];
+    const normalizeRefs = (value: unknown) => Array.isArray(value) && value.length <= 20 ? value.map(item => {
+      const ref = item && typeof item === 'object' ? item as Record<string, unknown> : null;
+      const label = safeText(ref?.label, 100), url = validSiteUrl(ref?.url, true);
+      return label && url ? { label, url } : null;
+    }) : null;
+    const links = normalizeRefs(project.links ?? []), notes = normalizeRefs(project.notes ?? []);
+    if (!stack || stack.length > 20 || githubRepos.length > 20 || githubRepos.some(repo => !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo))
+      || !links || links.some(value => !value) || !notes || notes.some(value => !value)) return null;
+    let milestone: { name: string; completed: number; total: number } | null = null;
+    if (project.milestone !== undefined) {
+      const raw = project.milestone && typeof project.milestone === 'object' ? project.milestone as Record<string, unknown> : null;
+      const name = safeText(raw?.name, 120), completed = Number(raw?.completed), total = Number(raw?.total);
+      if (!name || !Number.isInteger(completed) || !Number.isInteger(total) || completed < 0 || total < 1 || completed > total) return null;
+      milestone = { name, completed, total };
+    }
+    const visibility = project.visibility === 'public' || project.visibility === 'private' ? project.visibility : '';
+    if (!visibility) return null;
+    const noteHint = safeText(project.noteHint, 180);
+    return { id, ...values, status, phase, stack, githubRepos, visibility, links, notes, ...(milestone ? { milestone } : {}), ...(noteHint ? { noteHint } : {}) };
+  });
+  return projects.some(item => !item) ? null : projects;
+}
+
+function githubPublishing(env: AuthEnv) {
+  if (!env.GITHUB_CONTENT_TOKEN || !env.GITHUB_OWNER || !env.GITHUB_REPO) return null;
+  const base = (env.GITHUB_API_BASE_URL || 'https://api.github.com').replace(/\/+$/, '');
+  const root = `${base}/repos/${encodeURIComponent(env.GITHUB_OWNER)}/${encodeURIComponent(env.GITHUB_REPO)}`;
+  const headers = { Accept: 'application/vnd.github+json', Authorization: `Bearer ${env.GITHUB_CONTENT_TOKEN}`, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'HELICASE-Studio' };
+  return { root, headers };
+}
+
+function publicationFields(row: Pick<SiteSettingRow, 'published_hash' | 'published_commit_sha' | 'published_at'>) {
+  return {
+    publishedHash: row.published_hash,
+    publishedCommitSha: row.published_commit_sha,
+    publishedAt: row.published_at,
+  };
+}
+
+async function latestCommitForPath(github: NonNullable<ReturnType<typeof githubPublishing>>, path: string): Promise<string | null> {
+  const response = await fetch(`${github.root}/commits?sha=main&path=${encodeURIComponent(path)}&per_page=1`, { headers: github.headers });
+  if (!response.ok) return null;
+  const commits = await response.json() as Array<{ sha?: string }>;
+  return commits[0]?.sha || null;
+}
+
+async function recordSitePublication(db: Database, name: SiteSettingName, publishedHash: string, commitSha: string) {
+  return db.prepare("UPDATE site_settings SET draft_hash = COALESCE(draft_hash, ?), published_hash = ?, published_commit_sha = ?, published_at = datetime('now') WHERE key = ? RETURNING revision, draft_hash, published_hash, published_commit_sha, published_at")
+    .bind(publishedHash, publishedHash, commitSha, name)
+    .first<Pick<SiteSettingRow, 'revision' | 'draft_hash' | 'published_hash' | 'published_commit_sha' | 'published_at'>>();
+}
+
+async function publishSiteSetting(request: Request, env: AuthEnv, name: SiteSettingName): Promise<Response> {
+  if (request.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  const db = database(env), github = githubPublishing(env);
+  if (!db) return json(503, { error: 'Site settings storage is not configured' });
+  if (!github) return json(503, { error: 'GitHub publishing is not configured' });
+  let body: { expectedDraftHash?: unknown; expectedRevision?: unknown }; try { body = await request.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
+  const row = await db.prepare('SELECT payload, revision, draft_hash, updated_at, published_hash, published_commit_sha, published_at FROM site_settings WHERE key = ?').bind(name).first<SiteSettingRow>();
+  if (!row) return json(409, { error: 'Save a draft before publishing' });
+  let raw: unknown; try { raw = JSON.parse(row.payload); } catch { return json(500, { error: 'Stored draft is invalid JSON' }); }
+  const value = validateSiteSetting(name, raw);
+  if (!value) return json(400, { error: `Invalid ${name} draft` });
+  const serialized = `${JSON.stringify(value, null, 2)}\n`, draftHash = await sha256Text(serialized);
+  if (!Number.isInteger(body.expectedRevision) || body.expectedRevision !== row.revision || typeof body.expectedDraftHash !== 'string' || body.expectedDraftHash !== draftHash) {
+    return json(409, { error: 'Draft changed; reload before publishing', revision: row.revision, draftHash });
+  }
+  const path = `src/data/${name}.json`, apiUrl = `${github.root}/contents/${path}`;
+  const existing = await fetch(apiUrl, { headers: github.headers });
+  let fileSha: string | undefined, existingText = '';
+  if (existing.ok) {
+    const file = await existing.json() as { sha?: string; content?: string };
+    fileSha = file.sha;
+    if (file.content) existingText = new TextDecoder().decode(Uint8Array.from(atob(file.content.replace(/\n/g, '')), character => character.charCodeAt(0)));
+  } else if (existing.status !== 404) return json(502, { error: 'Could not inspect GitHub content' });
+  let commitSha: string | null = null;
+  if (existingText === serialized) {
+    commitSha = await latestCommitForPath(github, path);
+  } else {
+    const response = await fetch(apiUrl, {
+      method: 'PUT', headers: { ...github.headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: `publish: ${name}`, content: base64Utf8(serialized), branch: 'main', ...(fileSha ? { sha: fileSha } : {}) }),
+    });
+    if (!response.ok) return json(response.status === 409 ? 409 : 502, { error: response.status === 409 ? 'GitHub content changed; retry publishing' : 'GitHub publish failed' });
+    const result = await response.json() as { commit?: { sha?: string }; content?: { sha?: string } };
+    commitSha = result.commit?.sha || await latestCommitForPath(github, path);
+  }
+  if (!commitSha || !/^[a-f0-9]{40}$/i.test(commitSha)) return json(502, { error: 'GitHub publish succeeded but its commit SHA could not be verified' });
+  const recorded = await recordSitePublication(db, name, draftHash, commitSha);
+  if (!recorded) return json(500, { error: 'Published to GitHub, but publication metadata could not be recorded' });
+  return json(200, {
+    ok: true, state: 'published', alreadyPublished: existingText === serialized, path, commitSha, draftHash,
+    revision: recorded.revision, draftChangedSincePublish: recorded.draft_hash !== draftHash,
+    ...publicationFields(recorded),
+  });
+}
+
+async function adminSite(request: Request, env: AuthEnv, name: SiteSettingName): Promise<Response> {
   const db = database(env); if (!db) return json(503, { error: 'Site settings storage is not configured' });
-  if (!['profile', 'links', 'projects'].includes(name)) return json(404, { error: 'Not found' });
-  if (request.method === 'GET') { const row = await db.prepare('SELECT payload FROM site_settings WHERE key = ?').bind(name).first<{ payload: string }>(); return json(200, { value: row ? JSON.parse(row.payload) : null }); }
-  if (request.method !== 'POST') return json(405, { error: 'Method not allowed' }); let body: { value?: unknown }; try { body = await request.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
-  const value = body.value; if (!value || typeof value !== 'object' || JSON.stringify(value).length > 20_000) return json(400, { error: 'Invalid setting' });
-  await db.prepare("INSERT INTO site_settings (key, payload) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = datetime('now')").bind(name, JSON.stringify(value)).run();
-  return json(200, { ok: true, note: 'Saved to Studio storage. Public source publishing remains an explicit later action.' });
+  if (request.method === 'GET') {
+    const row = await db.prepare('SELECT payload, revision, draft_hash, updated_at, published_hash, published_commit_sha, published_at FROM site_settings WHERE key = ?').bind(name).first<SiteSettingRow>();
+    if (!row) return json(200, { value: null, revision: 0, updatedAt: null, draftHash: null, publishedHash: null, publishedCommitSha: null, publishedAt: null });
+    let raw: unknown; try { raw = JSON.parse(row.payload); } catch { return json(500, { error: 'Stored draft is invalid JSON' }); }
+    const value = validateSiteSetting(name, raw);
+    if (!value) return json(500, { error: `Stored ${name} draft does not match the current schema` });
+    const serialized = `${JSON.stringify(value, null, 2)}\n`;
+    const draftHash = row.draft_hash || await sha256Text(serialized);
+    if (!row.draft_hash) await db.prepare('UPDATE site_settings SET draft_hash = ? WHERE key = ? AND draft_hash IS NULL').bind(draftHash, name).run();
+    return json(200, { value, revision: row.revision, updatedAt: row.updated_at, draftHash, ...publicationFields(row) });
+  }
+  if (request.method !== 'POST') return json(405, { error: 'Method not allowed' }); let body: { value?: unknown; expectedRevision?: unknown }; try { body = await request.json(); } catch { return json(400, { error: 'Invalid JSON' }); }
+  const value = validateSiteSetting(name, body.value); if (!value || JSON.stringify(value).length > 20_000) return json(400, { error: `Invalid ${name} setting` });
+  const serialized = `${JSON.stringify(value, null, 2)}\n`;
+  const draftHash = await sha256Text(serialized), expectedRevision = body.expectedRevision;
+  if (!Number.isInteger(expectedRevision) || Number(expectedRevision) < 0) return json(400, { error: 'expectedRevision must be a non-negative integer' });
+  const saved = expectedRevision === 0
+    ? await db.prepare("INSERT INTO site_settings (key, payload, revision, draft_hash) VALUES (?, ?, 1, ?) ON CONFLICT(key) DO NOTHING RETURNING revision, updated_at, published_hash, published_commit_sha, published_at")
+      .bind(name, JSON.stringify(value), draftHash).first<Pick<SiteSettingRow, 'revision' | 'updated_at' | 'published_hash' | 'published_commit_sha' | 'published_at'>>()
+    : await db.prepare("UPDATE site_settings SET payload = ?, revision = revision + 1, draft_hash = ?, updated_at = datetime('now') WHERE key = ? AND revision = ? RETURNING revision, updated_at, published_hash, published_commit_sha, published_at")
+      .bind(JSON.stringify(value), draftHash, name, expectedRevision).first<Pick<SiteSettingRow, 'revision' | 'updated_at' | 'published_hash' | 'published_commit_sha' | 'published_at'>>();
+  if (!saved) {
+    const current = await db.prepare('SELECT revision, draft_hash, updated_at FROM site_settings WHERE key = ?').bind(name).first<Pick<SiteSettingRow, 'revision' | 'draft_hash' | 'updated_at'>>();
+    return json(409, { error: 'Draft changed in another session; reload before saving', revision: current?.revision ?? 0, draftHash: current?.draft_hash ?? null, updatedAt: current?.updated_at ?? null });
+  }
+  return json(200, {
+    ok: true, state: 'draft-saved', revision: saved.revision, updatedAt: saved.updated_at, draftHash,
+    ...publicationFields(saved), note: 'Draft saved privately. Public site is unchanged.',
+  });
 }
 
 export default { async fetch(request: Request, env: AuthEnv): Promise<Response> {
   const pathname = new URL(request.url).pathname;
+  if (pathname.startsWith('/api/auth/')) return authApi(request, env, pathname);
   if ((isProtectedPath(pathname) || pathname === '/api/publish' || pathname.startsWith('/api/admin/')) && !authorized(request, env)) return unauthorized();
   if (pathname === '/api/oc-chat') {
     if (!database(env)) return json(503, { error: 'OC protection storage is not configured' }); let body: { turnstileToken?: unknown }; try { body = await request.clone().json(); } catch { return json(400, { error: 'Invalid request body' }); }
@@ -149,6 +417,7 @@ export default { async fetch(request: Request, env: AuthEnv): Promise<Response> 
   const adminMatch = pathname.match(/^\/api\/admin\/content\/(favorites|mood|zine)(?:\/([A-Za-z0-9_-]{8,64}))?$/); if (adminMatch) return adminContent(request, env, adminMatch[1] as ContentKind, adminMatch[2]);
   if (pathname === '/api/admin/comments') return adminComments(request, env);
   if (pathname === '/api/admin/articles') return adminArticles(request, env);
-  const siteMatch = pathname.match(/^\/api\/admin\/site\/(profile|links|projects)$/); if (siteMatch) return adminSite(request, env, siteMatch[1]);
+  const sitePublishMatch = pathname.match(/^\/api\/admin\/site\/(profile|links|projects)\/publish$/); if (sitePublishMatch) return publishSiteSetting(request, env, sitePublishMatch[1] as SiteSettingName);
+  const siteMatch = pathname.match(/^\/api\/admin\/site\/(profile|links|projects)$/); if (siteMatch) return adminSite(request, env, siteMatch[1] as SiteSettingName);
   if (pathname.startsWith('/api/')) return json(404, { error: 'Not found' }); return env.ASSETS.fetch(request);
 } };

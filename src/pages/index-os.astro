@@ -44,12 +44,13 @@ const dockItems = [
   { id: 'favorites',    icon: '❤️', label: 'FAVES' },
 ];
 
-// Serialize ASCII patterns for client-side terminal
-const allPatterns = JSON.stringify(ASCII_PATTERNS);
-const patternOrder = JSON.stringify(PATTERN_ORDER);
+// Escape '<' so embedded JSON can never terminate its script tag.
+const jsonForInlineScript = (value: unknown) => JSON.stringify(value).replaceAll('<', '\\u003c');
+const allPatterns = jsonForInlineScript(ASCII_PATTERNS);
+const patternOrder = jsonForInlineScript(PATTERN_ORDER);
 
 // Serialize finder data for client-side window content
-const finderDataJson = JSON.stringify(finderData);
+const finderDataJson = jsonForInlineScript(finderData);
 ---
 
 <!doctype html>
@@ -63,7 +64,7 @@ const finderDataJson = JSON.stringify(finderData);
 </head>
 <body>
   <!-- ── Desktop ──────────────────────────── -->
-  <div class="os-desktop" id="os-desktop">
+  <div class="os-desktop" id="os-desktop" data-ark-theme="exa" data-ark-depth="complex" data-ark-mode="desktop">
     <!-- Menu bar -->
     <MenuBar />
 
@@ -105,12 +106,12 @@ const finderDataJson = JSON.stringify(finderData);
   </div>
 
   <!-- Data from server (consumed by client JS) -->
-  <script type="application/json" id="data-patterns">{allPatterns}</script>
-  <script type="application/json" id="data-pattern-order">{patternOrder}</script>
-  <script type="application/json" id="data-finder">{finderDataJson}</script>
+  <script is:inline type="application/json" id="data-patterns" set:html={allPatterns}></script>
+  <script is:inline type="application/json" id="data-pattern-order" set:html={patternOrder}></script>
+  <script is:inline type="application/json" id="data-finder" set:html={finderDataJson}></script>
 
   <!-- ── Client Script ────────────────────── -->
-  <script type="module">
+  <script is:inline type="module">
     // @ts-nocheck -- isolated experimental desktop prototype.
     import { WindowManager } from '/os/window-manager.js';
 
@@ -130,10 +131,11 @@ const finderDataJson = JSON.stringify(finderData);
       id: 'terminal',
       title: 'Terminal — helicase@desktop',
       icon: '⬡',
-      width: 520,
-      height: 340,
+      width: 600,
+      height: 400,
       minWidth: 300,
       minHeight: 200,
+      center: true,
       content: createTerminalContent,
     });
 

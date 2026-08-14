@@ -13,7 +13,7 @@
     <!-- Avatar: blur → sharp -->
     <div class="entry-avatar" id="entry-avatar">
       <img
-        src="/images/avatar.svg"
+        src="/images/avatar.jpg"
         alt="HELICASE"
         width="120"
         height="120"
@@ -54,6 +54,7 @@
     flex-direction: column;
     align-items: center;
     gap: 32px;
+    max-height: calc(100dvh - 24px);
   }
 
   .entry-avatar img {
@@ -104,6 +105,13 @@
   .entry-enter:hover {
     color: var(--color-nuclear);
   }
+
+  @media (max-height: 620px) {
+    .entry-content { gap: 12px; }
+    .entry-avatar img { width: 72px; height: 72px; }
+    .entry-ascii { min-height: 138px; font-size: 10px; line-height: 1.05; }
+    .entry-enter { font-size: 11px; }
+  }
 </style>
 
 <script>
@@ -129,6 +137,14 @@
       const enterBtn = document.getElementById('entry-enter');
 
       if (!overlay) return;
+
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        if (enterBtn) {
+          enterBtn.style.opacity = '1';
+          enterBtn.style.pointerEvents = 'auto';
+        }
+        return;
+      }
 
       // Phase 1: Avatar blur → sharp (800ms)
       if (avatar) {
@@ -173,6 +189,9 @@
       // Phase 5: Click → dismiss overlay
       enterBtn?.addEventListener('click', async () => {
         sessionStorage.setItem(OVERLAY_KEY, '1');
+        // The user gesture also authorizes optional homepage audio. Dispatch
+        // synchronously so browsers can start it before the gesture expires.
+        document.dispatchEvent(new CustomEvent('helicase:entered'));
 
         if (overlay) {
           overlay.style.transition = `opacity var(--duration-layer) var(--ease-mechanical)`;

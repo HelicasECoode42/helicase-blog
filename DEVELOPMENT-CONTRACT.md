@@ -37,7 +37,11 @@
 ## 架构边界
 
 - `src/content/blog/`：公开长文章的唯一事实源。
-- `src/data/*.ts|json`：公开项目、活动、灵感和配置。
-- `.helicase/`：仅本机 Studio 状态，禁止进入构建产物。
+- `src/data/*.json`：公开 Profile、项目、链接、灵感、活动历史和配置的唯一事实源；不得再生成同名 TS 副本。
+- Projects 的 status、phase、current、next 由本人表达；GitHub 同步只能更新活动历史，项目活动日期和 7/30 天计数由页面推导，不得用 commit 数猜测完成百分比或覆盖项目描述。
+- `.helicase/`：仅本机私人日报和经本人主动纳入的工作摘要，禁止进入 Git 与构建产物。
 - `localStorage`：仅个人浏览器体验，不视为已发布、已同步或已备份。
 - `worker/`：仅承载确需服务端保护的公开 API；`/api/*` 先于静态资产运行，但不得读取私人内容源。
+- Studio Save Draft 必须使用 D1 revision 做原子 CAS，冲突时保留本地编辑并要求显式 reload；不得静默覆盖其他窗口。
+- `draft saved` 仅表示写入 D1；`published` 仅表示 GitHub 提交成功。D1 持久化发布 hash/commit，只有线上构建的对应内容 hash 一致才能显示 `live`。
+- 手动生产部署必须来自干净、已推送的 `main`，重新构建后确认 `dist/build-meta.json` 属于当前 HEAD；不得直接上传遗留 `dist`。

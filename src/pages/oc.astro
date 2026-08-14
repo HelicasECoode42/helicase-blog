@@ -3,7 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
 ---
 <BaseLayout title="OC" description="HELICASE 空间的虚拟接待者">
-  <main class="oc">
+  <main class="oc" data-ark-theme="exa" data-ark-depth="complex" data-ark-mode="host">
     <a href="/">← canvas</a>
 
     <section>
@@ -13,19 +13,28 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
 
       <div class="oc-dialog">
         <span class="oc-tag">HOST_00 / PROTOTYPE</span>
-        <h1 class="oc-name">—</h1>
+        <h1 class="oc-name">HOST_00</h1>
+        <p class="oc-capabilities">PUBLIC INDEX · WORK / WRITINGS / NOW</p>
 
         <!-- Conversation area -->
         <div class="oc-chat" id="oc-chat">
-          <div class="oc-msg oc-msg--system">offline — 说点什么来唤醒 HOST_00</div>
+          <div class="oc-msg oc-msg--system">online — 可以问我项目、文章、近况，或者从哪里开始看</div>
         </div>
 
         <!-- Preset prompts -->
         <div class="oc-prompts">
-          <button data-q="最近在做什么？">最近在做什么？</button>
-          <button data-q="推荐一篇文章">推荐一篇文章</button>
-          <button data-q="这里为什么叫 HELICASE？">为什么叫 HELICASE？</button>
+          <button data-q="我第一次来，应该从哪里开始看？">从哪里开始？</button>
+          <button data-q="最近在做什么？请给我对应页面。">最近在做什么？</button>
+          <button data-q="根据站内内容推荐一篇文章，并给出文章路径。">推荐一篇文章</button>
         </div>
+
+        <nav class="oc-map" aria-label="HELICASE 公开内容导航">
+          <span>DIRECT MAP</span>
+          <a href="/projects">WORK</a>
+          <a href="/blog">WRITINGS</a>
+          <a href="/now">NOW</a>
+          <a href="/interests">INTERESTS</a>
+        </nav>
 
         <!-- Free-form input -->
         <form class="oc-input" id="oc-form">
@@ -64,7 +73,22 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
   function addMsg(text: string, who: 'user' | 'ai' | 'system') {
     const div = document.createElement('div');
     div.className = `oc-msg oc-msg--${who}`;
-    div.textContent = text;
+    if (who !== 'ai') {
+      div.textContent = text;
+    } else {
+      const routePattern = /\/(?:now|projects(?:\/[a-z0-9-]+)?|blog(?:\/[a-z0-9-]+)?|interests|favorites|zine|mood|links|about)(?=$|[\s，。；、）)])/gi;
+      let cursor = 0;
+      for (const match of text.matchAll(routePattern)) {
+        const index = match.index ?? 0;
+        div.append(document.createTextNode(text.slice(cursor, index)));
+        const link = document.createElement('a');
+        link.href = match[0];
+        link.textContent = match[0];
+        div.append(link);
+        cursor = index + match[0].length;
+      }
+      div.append(document.createTextNode(text.slice(cursor)));
+    }
     chat.appendChild(div);
     chat.scrollTop = chat.scrollHeight;
     return div;
@@ -179,6 +203,11 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
     color: var(--color-deep-blue);
     margin: 14px 0;
   }
+  .oc-capabilities {
+    font: 9px var(--font-mono);
+    letter-spacing: .1em;
+    color: var(--color-silver);
+  }
 
   /* ── Chat area ─────────────────── */
   .oc-chat {
@@ -211,6 +240,11 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
     background: rgba(51, 78, 213, 0.03);
     font-family: var(--font-body);
     color: var(--color-black);
+  }
+  :global(.oc-msg--ai a) {
+    color: var(--color-blue);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
   .oc-msg--system {
     align-self: center;
@@ -245,6 +279,20 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
     border-color: var(--color-blue);
     color: var(--color-blue);
   }
+  .oc-map {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 0 12px;
+    padding: 9px 0;
+    border-top: 1px solid var(--color-silver-light);
+    border-bottom: 1px solid var(--color-silver-light);
+    font: 9px var(--font-mono);
+    letter-spacing: .09em;
+  }
+  .oc-map span { margin-right: auto; color: var(--color-silver); }
+  .oc-map a { color: var(--color-text-secondary); }
+  .oc-map a:hover { color: var(--color-blue); }
 
   /* ── Input bar ─────────────────── */
   .oc-input {
@@ -292,5 +340,7 @@ const turnstileSiteKey = import.meta.env.PUBLIC_TURNSTILE_SITE_KEY || '';
       margin-top: 40px;
     }
     .portrait { height: 240px; }
+    .oc-map { flex-wrap: wrap; }
+    .oc-map span { flex-basis: 100%; }
   }
 </style>

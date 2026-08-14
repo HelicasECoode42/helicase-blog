@@ -1,4 +1,16 @@
 {
-  "github": { "enabled": false, "username": "" },
+  "github": {
+    "enabled": true,
+    "username": "HelicasECoode42",
+    "repositoryAliases": {
+      "HelicasECoode42/helicase-blog": "HELICASE",
+      "HelicasECoode42/EchoForge": "EchoForge",
+      "HelicasECoode42/ai-pr-review": "AI PR Review",
+      "HelicasECoode42/AI_secretary-generated-by-AI": "AI Secretary",
+      "ULookup/responder": "小红花 GAME · responder",
+      "HelicasECoode42/TencentDB-Agent-Memory": "TencentDB Agent Memory",
+      "TencentCloud/TencentDB-Agent-Memory": "TencentDB Agent Memory"
+    }
+  },
   "leetcode": { "enabled": false, "username": "" }
 }

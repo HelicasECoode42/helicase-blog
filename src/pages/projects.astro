@@ -1,41 +1,218 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import projects from '../data/projects';
-const publicProjects = projects.filter(p => p.visibility === 'public');
+import projects from '../data/projects.json';
+
+const selected = projects.filter(project => project.visibility === 'public' && project.status === 'active');
+const ordered = [
+  ...selected.filter(project => project.id === 'echoforge'),
+  ...selected.filter(project => project.id !== 'echoforge'),
+];
 ---
-<BaseLayout title="Projects" description="技术项目、实验、作品与持续成长">
-  <main class="work-page">
-    <h1 class="sr-only">PROJECTS</h1>
-    <div class="project-list">
-      {publicProjects.map(project => (
-        <article class="project" id={project.id}>
-          <div class="project-head"><div><span class="status">{project.status}</span><h2>{project.name}</h2></div><strong>{project.progress}%</strong></div>
-          <p class="summary">{project.summary}</p>
-          <div class="meter" aria-label={`项目进度 ${project.progress}%`}><span style={`width:${project.progress}%`}></span></div>
-          <dl><div><dt>NOW</dt><dd>{project.current}</dd></div><div><dt>NEXT</dt><dd>{project.next}</dd></div></dl>
-          <div class="stack">{project.stack.map(item => <span>{item}</span>)}</div>
-          {(project.notes?.length || project.noteHint) && (
-            <details class="project-notes">
-              <summary>NOTES / NAVIGATE</summary>
-              <div class="project-notes-body">
-                {project.notes?.map(note => <a href={note.url}>{note.label} →</a>)}
-                {project.noteHint && <span>{project.noteHint}</span>}
-              </div>
-            </details>
-          )}
-          <time>updated {project.updatedAt}</time>
-        </article>
-      ))}
+
+<BaseLayout title="Work" description="核心项目、持续实验与公开作品">
+  <main class="work-page" data-ark-theme="exa" data-ark-depth="moderate" data-ark-mode="project-index">
+    <header class="work-header">
+      <h1>WORK</h1>
+      <span>SELECTED PROJECTS / {String(ordered.length).padStart(2, '0')}</span>
+    </header>
+
+    <div class="work-explorer">
+      <nav class="project-selector" aria-label="Select a project" role="tablist" aria-orientation="vertical">
+        <span class="selector-label">PROJECT INDEX</span>
+        {ordered.map((project, index) => (
+          <button
+            type="button"
+            role="tab"
+            id={`work-tab-${project.id}`}
+            aria-controls={`work-panel-${project.id}`}
+            aria-selected={index === 0 ? 'true' : 'false'}
+            tabindex={index === 0 ? 0 : -1}
+            data-work-tab={project.id}
+          >
+            <span>{String(index + 1).padStart(2, '0')}</span>
+            <strong>{project.name}</strong>
+            <em>{project.phase}</em>
+          </button>
+        ))}
+      </nav>
+
+      <div class="project-stage">
+        {ordered.map((project, index) => (
+          <article
+            role="tabpanel"
+            id={`work-panel-${project.id}`}
+            aria-labelledby={`work-tab-${project.id}`}
+            data-work-panel={project.id}
+            hidden={index !== 0}
+          >
+            <div class="project-number" aria-hidden="true">{String(index + 1).padStart(2, '0')}</div>
+            <span class="project-state">{project.type} / {project.phase}</span>
+            <h2>{project.name}</h2>
+            <p>{project.summary}</p>
+            <div class="project-meta">
+              <span>BUILT WITH</span>
+              <ul>{project.stack.map(item => <li>{item}</li>)}</ul>
+            </div>
+            <a href={`/projects/${project.id}`}>OPEN PROJECT <span>→</span></a>
+          </article>
+        ))}
+      </div>
     </div>
   </main>
+
+  <script>
+    function setupWorkExplorer() {
+      const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-work-tab]'));
+      const panels = Array.from(document.querySelectorAll<HTMLElement>('[data-work-panel]'));
+      if (!tabs.length || tabs[0].dataset.ready === 'true') return;
+      tabs[0].dataset.ready = 'true';
+
+      function selectProject(tab: HTMLButtonElement, moveFocus = false) {
+        const id = tab.dataset.workTab;
+        for (const candidate of tabs) {
+          const active = candidate === tab;
+          candidate.setAttribute('aria-selected', String(active));
+          candidate.tabIndex = active ? 0 : -1;
+        }
+        for (const panel of panels) {
+          const active = panel.dataset.workPanel === id;
+          panel.hidden = !active;
+          if (active) {
+            panel.classList.remove('is-entering');
+            void panel.offsetWidth;
+            panel.classList.add('is-entering');
+            panel.addEventListener('animationend', () => panel.classList.remove('is-entering'), { once: true });
+          }
+        }
+        if (moveFocus) tab.focus();
+        history.replaceState(null, '', `#${id}`);
+      }
+
+      for (const tab of tabs) {
+        tab.addEventListener('click', () => selectProject(tab));
+        tab.addEventListener('keydown', event => {
+          if (!['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          const current = tabs.indexOf(tab);
+          const next = event.key === 'Home' ? 0
+            : event.key === 'End' ? tabs.length - 1
+            : ['ArrowDown', 'ArrowRight'].includes(event.key) ? (current + 1) % tabs.length
+            : (current - 1 + tabs.length) % tabs.length;
+          selectProject(tabs[next], true);
+        });
+      }
+
+      const requested = location.hash.slice(1);
+      const initial = tabs.find(tab => tab.dataset.workTab === requested);
+      if (initial) selectProject(initial);
+    }
+
+    document.addEventListener('astro:page-load', setupWorkExplorer);
+    setupWorkExplorer();
+  </script>
 </BaseLayout>
-<style>
-  .work-page{max-width:900px;margin:auto;padding:56px 24px 100px}.back{font:12px var(--font-mono);color:var(--color-silver)}header{margin:48px 0 36px}.eyebrow,.status,dt,time,.stack{font-family:var(--font-mono)}.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--color-blue);margin-bottom:10px}h1{font:700 1rem/1 var(--font-mono);letter-spacing:.2em;color:var(--color-deep-blue)}.project-list{display:grid;gap:28px}.project{border-top:1px solid var(--color-silver-light);padding-top:22px}.project-head{display:flex;justify-content:space-between;align-items:start}.project-head h2{font:600 1.7rem var(--font-body);margin-top:6px}.project-head strong{font:500 2.5rem var(--font-mono);color:var(--color-silver-light)}.status{font-size:10px;color:var(--color-blue);letter-spacing:.12em}.summary{max-width:650px;line-height:1.7;margin:18px 0}.meter{height:2px;background:var(--color-silver-light);margin:20px 0}.meter span{height:100%;display:block;background:var(--color-blue)}dl{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin:26px 0}dt{font-size:9px;letter-spacing:.15em;color:var(--color-silver)}dd{font-size:.9rem;line-height:1.6;margin-top:7px}.stack{display:flex;gap:8px;flex-wrap:wrap}.stack span{font-size:10px;border:1px solid var(--color-silver-light);padding:4px 7px}time{display:block;font-size:9px;color:var(--color-silver);margin-top:20px}@media(max-width:600px){dl{grid-template-columns:1fr}.work-page{padding:40px 16px 80px}}
-</style>
-<style>
-  .project-notes{margin-top:22px;border-top:1px solid var(--color-silver-light);padding-top:12px}.project-notes summary{cursor:pointer;list-style:none;font:10px var(--font-mono);letter-spacing:.12em;color:var(--color-blue)}.project-notes summary::-webkit-details-marker{display:none}.project-notes summary::before{content:'＋ ';color:var(--color-silver)}.project-notes[open] summary::before{content:'－ ';}.project-notes-body{display:flex;flex-wrap:wrap;gap:10px 18px;padding:14px 0 2px}.project-notes-body a,.project-notes-body span{font:12px var(--font-mono);color:var(--color-silver)}.project-notes-body a:hover{color:var(--color-blue)}
-</style>
-<style>
-  .work-page{padding-top:34px}
-  @media(max-width:600px){.work-page{padding-top:28px}}
+
+<style is:global>
+  .work-page {
+    width: min(1240px, 100%);
+    height: calc(100svh - 36px);
+    margin: 0 auto;
+    padding: 22px 32px 24px;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 18px;
+    overflow: hidden;
+  }
+  .work-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 13px;
+    border-bottom: 1px solid var(--color-deep-blue);
+    font-family: var(--font-mono);
+  }
+  .work-header h1 { font: 700 clamp(1.65rem, 3vw, 2.45rem)/.9 var(--font-mono); letter-spacing: -.045em; color: var(--color-deep-blue); }
+  .work-header span { font-size: .62rem; letter-spacing: .16em; color: var(--color-blue); }
+
+  .work-explorer { min-height: 0; display: grid; grid-template-columns: minmax(220px, .72fr) minmax(0, 2.28fr); gap: clamp(28px, 5vw, 72px); }
+  .project-selector { min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--color-silver-light); font-family: var(--font-mono); }
+  .selector-label { padding: 12px 0 9px; font-size: .62rem; letter-spacing: .14em; color: var(--color-silver); }
+  .project-selector button {
+    width: 100%;
+    min-height: 58px;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 4px 12px;
+    align-content: center;
+    padding: 9px 8px 9px 0;
+    border: 0;
+    border-top: 1px solid var(--color-silver-light);
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition: padding-left 220ms var(--ease-mechanical), background-color 220ms ease, border-color 220ms ease;
+  }
+  .project-selector button:last-child { border-bottom: 1px solid var(--color-silver-light); }
+  .project-selector button > span { grid-row: 1 / 3; font-size: .6rem; color: var(--color-silver); }
+  .project-selector button strong { overflow: hidden; font: 600 .76rem/1.1 var(--font-body); color: var(--color-deep-blue); white-space: nowrap; text-overflow: ellipsis; }
+  .project-selector button em { font-size: .6rem; font-style: normal; letter-spacing: .09em; color: var(--color-silver); text-transform: uppercase; }
+  .project-selector button:hover strong,
+  .project-selector button[aria-selected="true"] strong { color: var(--color-blue); }
+  .project-selector button[aria-selected="true"] { padding-left: 10px; border-left: 3px solid var(--color-blue); background: color-mix(in srgb, var(--color-blue) 3%, transparent); }
+  .project-selector button[aria-selected="true"] > span { color: var(--color-blue); }
+
+  .project-stage { min-width: 0; min-height: 0; }
+  .project-stage article {
+    position: relative;
+    height: 100%;
+    min-height: 0;
+    padding: clamp(24px, 4vh, 42px) clamp(24px, 4vw, 52px);
+    overflow: hidden;
+    border-left: 3px solid var(--color-blue);
+    border-bottom: 1px solid var(--color-deep-blue);
+    background: linear-gradient(120deg, color-mix(in srgb, var(--color-blue) 4%, transparent), transparent 66%);
+  }
+  .project-stage article[hidden] { display: none; }
+  .project-stage article.is-entering { animation: work-panel-enter 300ms var(--ease-mechanical) both; }
+  .project-number { position: absolute; right: 20px; top: 4px; font: 500 clamp(5rem, 12vh, 8.5rem)/1 var(--font-mono); color: color-mix(in srgb, var(--color-blue) 8%, transparent); }
+  .project-state { position: relative; font: .62rem/1 var(--font-mono); letter-spacing: .14em; color: var(--color-blue); text-transform: uppercase; }
+  .project-stage h2 { position: relative; max-width: 82%; margin-top: clamp(34px, 7vh, 64px); font: 650 clamp(2.35rem, 5vw, 4.6rem)/.95 var(--font-body); letter-spacing: -.035em; color: var(--color-deep-blue); }
+  .project-stage article > p { position: relative; max-width: 720px; margin-top: 20px; font: .86rem/1.7 var(--font-body); color: var(--color-text-secondary); }
+  .project-meta { position: absolute; left: clamp(24px, 4vw, 52px); right: clamp(24px, 4vw, 52px); bottom: 70px; padding-top: 12px; border-top: 1px solid var(--color-silver-light); font-family: var(--font-mono); }
+  .project-meta > span { font-size: .6rem; letter-spacing: .12em; color: var(--color-silver); }
+  .project-meta ul { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; list-style: none; }
+  .project-meta li { padding: 4px 7px; border: 1px solid var(--color-silver-light); font-size: .62rem; color: var(--color-text-secondary); }
+  .project-stage article > a { position: absolute; right: clamp(24px, 4vw, 52px); bottom: 24px; font: 600 .62rem/1 var(--font-mono); letter-spacing: .12em; color: var(--color-blue); }
+  .project-stage article > a span { margin-left: 8px; }
+
+  @keyframes work-panel-enter {
+    from { clip-path: inset(0 0 0 10%); transform: translateX(10px); opacity: .25; }
+    to { clip-path: inset(0); transform: translateX(0); opacity: 1; }
+  }
+
+  @media (max-width: 760px), (orientation: portrait) {
+    .work-page { height: auto; min-height: calc(100svh - 36px); padding: 24px 16px 64px; overflow: visible; }
+    .work-header { align-items: center; }
+    .work-explorer { grid-template-columns: 1fr; gap: 24px; }
+    .project-selector { display: grid; grid-template-columns: repeat(5, minmax(112px, 1fr)); overflow-x: auto; border-bottom: 1px solid var(--color-silver-light); }
+    .selector-label { display: none; }
+    .project-selector button { min-height: 66px; border-top: 0; border-right: 1px solid var(--color-silver-light); }
+    .project-selector button:last-child { border-bottom: 0; }
+    .project-selector button[aria-selected="true"] { padding-left: 8px; border-left: 0; border-bottom: 3px solid var(--color-blue); }
+    .project-stage article { min-height: 520px; padding: 28px 20px; }
+    .project-stage h2 { max-width: 100%; margin-top: 54px; font-size: clamp(2.2rem, 12vw, 3.4rem); }
+    .project-meta { left: 20px; right: 20px; }
+  }
+
+  @media (max-height: 660px) and (min-width: 761px) {
+    .project-selector button { min-height: 50px; }
+    .project-stage h2 { margin-top: 28px; }
+    .project-stage article > p { margin-top: 14px; line-height: 1.55; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .project-selector button { transition: none; }
+    .project-stage article.is-entering { animation: none; }
+  }
 </style>

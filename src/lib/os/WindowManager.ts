@@ -23,6 +23,7 @@ export interface WinDescriptor {
   icon: string
   x?: number
   y?: number
+  center?: boolean
   width: number
   height: number
   minWidth?: number
@@ -32,7 +33,7 @@ export interface WinDescriptor {
 
 type LayoutDump = Record<string, { x: number; y: number; w: number; h: number }>
 
-const LAYOUT_KEY = 'helicase-desktop-layout'
+const LAYOUT_KEY = 'helicase-desktop-layout-v2'
 const MAX_Z = 9999
 
 export class WindowManager {
@@ -94,10 +95,12 @@ export class WindowManager {
     const saved = this.loadLayout()
     const fromSave = saved[id]
     const cascade = this.wins.size * 24
-    const x = desc.x ?? (fromSave?.x ?? 80 + cascade)
-    const y = desc.y ?? (fromSave?.y ?? 60 + cascade)
     const w = fromSave?.w ?? desc.width
     const h = fromSave?.h ?? desc.height
+    const defaultX = desc.center ? Math.max(24, Math.round((window.innerWidth - w) / 2)) : 80 + cascade
+    const defaultY = desc.center ? Math.max(44, Math.round((window.innerHeight - h) / 2) - 20) : 60 + cascade
+    const x = fromSave?.x ?? (desc.x ?? defaultX)
+    const y = fromSave?.y ?? (desc.y ?? defaultY)
 
     const state: WinState = {
       id,
@@ -318,12 +321,6 @@ export class WindowManager {
 
   // ── Z-index normalization ───────────────
   private normalizeZ(): void {
-    const entries = [...this.wins.entries()].sort((a, b) => a[1].zIndex - b[1].zIndex)
-    this.nextZ = 100
-    for (const [, s] of entries) {
-      // Sort by zIndex, reassign from 100
-    }
-    // Reassign
     const sorted = [...this.wins.values()].sort((a, b) => a.zIndex - b.zIndex)
     let z = 100
     for (const s of sorted) {

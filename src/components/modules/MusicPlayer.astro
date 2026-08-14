@@ -1,0 +1,198 @@
+---
+interface Props {
+  title?: string;
+  source?: string;
+}
+
+const { title = '迷星', source } = Astro.props;
+const hasSource = Boolean(source);
+---
+
+<section class="music-player" data-music-player data-music-source={source} aria-label={`${title} 音乐播放器`}>
+  <div class="music-player-head">
+    <span>NOW PLAYING / 01</span>
+    <em>{hasSource ? 'LOCAL AUDIO' : 'SOURCE NEEDED'}</em>
+  </div>
+
+  <div class="music-player-main">
+    <button class="music-toggle" type="button" aria-label={hasSource ? `播放 ${title}` : `${title} 暂无音源`} disabled={!hasSource}>
+      <span aria-hidden="true" data-music-icon>▶</span>
+    </button>
+    <div class="music-track">
+      <strong>{title}</strong>
+      <span>{hasSource ? 'AUTO STARTS AFTER ENTRY' : 'ADD MP3 / M4A TO ENABLE'}</span>
+    </div>
+    <div class="music-wave" aria-hidden="true">
+      {Array.from({ length: 13 }, (_, index) => <i style={`--wave:${(index * 7) % 11 + 4}`}></i>)}
+    </div>
+  </div>
+
+  <div class="music-progress" aria-hidden="true"><i data-music-progress></i></div>
+  <div class="music-player-foot">
+    <time data-music-current>00:00</time>
+    <span>{hasSource ? 'CLICK ENTRY TO LISTEN' : 'WAITING FOR AUDIO'}</span>
+    <time data-music-duration>--:--</time>
+  </div>
+</section>
+
+<style>
+  .music-player {
+    width: min(100%, 360px);
+    padding: 12px 0 10px;
+    border-top: 1px solid var(--color-deep-blue);
+    border-bottom: 1px solid var(--color-silver-light);
+    font-family: var(--font-mono);
+  }
+
+  .music-player-head,
+  .music-player-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-size: .6rem;
+    letter-spacing: .12em;
+    color: var(--color-silver);
+  }
+  .music-player-head > span { color: var(--color-blue); }
+  .music-player-head em { font-style: normal; }
+
+  .music-player-main {
+    display: grid;
+    grid-template-columns: 40px minmax(90px, auto) minmax(80px, 1fr);
+    align-items: center;
+    gap: 13px;
+    min-height: 58px;
+  }
+
+  .music-toggle {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--color-deep-blue);
+    background: transparent;
+    color: var(--color-blue);
+    font: 600 .68rem/1 var(--font-mono);
+    cursor: pointer;
+    transition: color 220ms var(--ease-mechanical), background 220ms var(--ease-mechanical), transform 220ms var(--ease-mechanical);
+  }
+  .music-toggle:not(:disabled):hover { color: var(--color-canvas); background: var(--color-deep-blue); transform: translateX(3px); }
+  .music-toggle:disabled { opacity: .28; cursor: not-allowed; }
+
+  .music-track { min-width: 0; }
+  .music-track strong {
+    display: block;
+    font: 650 .96rem/1.1 var(--font-body);
+    color: var(--color-deep-blue);
+  }
+  .music-track span {
+    display: block;
+    margin-top: 6px;
+    font-size: .6rem;
+    color: var(--color-silver);
+    white-space: nowrap;
+  }
+
+  .music-wave {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    overflow: hidden;
+  }
+  .music-wave i {
+    width: 1px;
+    height: calc(var(--wave) * 1px);
+    background: var(--color-silver-light);
+    transform-origin: center;
+  }
+  .music-player.is-playing .music-wave i {
+    background: var(--color-blue);
+    animation: music-wave 1.8s ease-in-out infinite alternate;
+    animation-delay: calc(var(--wave) * -90ms);
+  }
+
+  .music-progress { height: 1px; overflow: hidden; background: var(--color-silver-light); }
+  .music-progress i { display: block; width: 0; height: 100%; background: var(--color-blue); }
+  .music-player-foot { padding-top: 7px; }
+  .music-player-foot span { text-align: center; }
+
+  @keyframes music-wave {
+    from { transform: scaleY(.45); }
+    to { transform: scaleY(1.45); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .music-toggle { transition: none; }
+    .music-player.is-playing .music-wave i { animation: none; }
+  }
+</style>
+
+<script>
+  declare global {
+    interface Window {
+      __helicaseMusic?: HTMLAudioElement;
+      __helicaseMusicSource?: string;
+      __helicaseMusicCleanup?: () => void;
+    }
+  }
+
+  const formatTime = (seconds: number) => {
+    if (!Number.isFinite(seconds)) return '--:--';
+    const minutes = Math.floor(seconds / 60);
+    return `${String(minutes).padStart(2, '0')}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+  };
+
+  function mountMusicPlayer() {
+    window.__helicaseMusicCleanup?.();
+    const player = document.querySelector<HTMLElement>('[data-music-player]');
+    if (!player) return;
+
+    const source = player.dataset.musicSource;
+    const toggle = player.querySelector<HTMLButtonElement>('.music-toggle');
+    const icon = player.querySelector<HTMLElement>('[data-music-icon]');
+    const progress = player.querySelector<HTMLElement>('[data-music-progress]');
+    const current = player.querySelector<HTMLTimeElement>('[data-music-current]');
+    const duration = player.querySelector<HTMLTimeElement>('[data-music-duration]');
+    if (!source || !toggle || !icon || !progress || !current || !duration) return;
+
+    const resolvedSource = new URL(source, window.location.href).href;
+    if (!window.__helicaseMusic || window.__helicaseMusicSource !== resolvedSource) {
+      window.__helicaseMusic?.pause();
+      window.__helicaseMusic = new Audio(resolvedSource);
+      window.__helicaseMusic.preload = 'metadata';
+      window.__helicaseMusic.loop = true;
+      window.__helicaseMusicSource = resolvedSource;
+    }
+    const audio = window.__helicaseMusic;
+    const controller = new AbortController();
+
+    const sync = () => {
+      const isPlaying = !audio.paused;
+      player.classList.toggle('is-playing', isPlaying);
+      icon.textContent = isPlaying ? 'Ⅱ' : '▶';
+      toggle.setAttribute('aria-label', `${isPlaying ? '暂停' : '播放'} ${player.getAttribute('aria-label')?.replace(' 音乐播放器', '') ?? '音乐'}`);
+      current.textContent = formatTime(audio.currentTime);
+      duration.textContent = formatTime(audio.duration);
+      progress.style.width = `${audio.duration ? (audio.currentTime / audio.duration) * 100 : 0}%`;
+    };
+    const play = () => { void audio.play().catch(() => sync()); };
+
+    toggle.addEventListener('click', () => audio.paused ? play() : audio.pause(), { signal: controller.signal });
+    audio.addEventListener('play', sync, { signal: controller.signal });
+    audio.addEventListener('pause', sync, { signal: controller.signal });
+    audio.addEventListener('loadedmetadata', sync, { signal: controller.signal });
+    audio.addEventListener('timeupdate', sync, { signal: controller.signal });
+    document.addEventListener('helicase:entered', play, { signal: controller.signal });
+    window.__helicaseMusicCleanup = () => controller.abort();
+    sync();
+
+    // Returning visitors may already have granted media playback to this
+    // origin. Try quietly; browsers that still require a fresh gesture leave
+    // the player paused and ready for one click.
+    if (sessionStorage.getItem('helicase-entry-seen')) play();
+  }
+
+  document.addEventListener('astro:page-load', mountMusicPlayer);
+  mountMusicPlayer();
+</script>

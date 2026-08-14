@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import inspirations from '../data/inspirations';
+import inspirations from '../data/inspirations.json';
 ---
 <BaseLayout title="Inspiration" description="灵感、视觉参考与尚未长成作品的想法">
   <main class="inspo"><a href="/" class="back">← canvas</a><header><span>INSPIRATION INDEX</span><h1>Things worth keeping.</h1><p>这里不是待办列表，而是可能长成文章、项目、图像或世界观的种子。</p></header><div class="grid">{inspirations.map((item,i)=><article><b>{String(i+1).padStart(2,'0')}</b><span>{item.kind}</span><h2>{item.title}</h2><p>{item.note}</p><div>{item.tags.map(t=><em>#{t}</em>)}</div><time>{item.date}</time></article>)}</div><a class="mood" href="/mood">visual moodboard →</a></main>

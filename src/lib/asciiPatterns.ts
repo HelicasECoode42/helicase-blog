@@ -292,7 +292,6 @@ export const PATTERN_ORDER: PatternKey[] = ['hex', 'nuclear', 'mobius', 'star', 
  */
 export class AsciiCore {
   private frames: string[] = [];
-  private fps: number;
   private interval: number;
   private frame: number = 0;
   private lastTime: number = 0;
@@ -308,7 +307,6 @@ export class AsciiCore {
     private order: PatternKey[],
     fps: number = 10,
   ) {
-    this.fps = fps;
     this.interval = 1000 / fps;
     this.patternIdx = 0;
     this.frames = patterns[order[0]];

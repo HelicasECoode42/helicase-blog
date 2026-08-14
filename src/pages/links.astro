@@ -1,10 +1,12 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import links from '../data/links';
+import rawLinks from '../data/links.json';
+type PublicLink = { name: string; note: string; url: string };
+const links = rawLinks as PublicLink[];
 ---
 
 <BaseLayout title="Links" description="友链">
-  <main class="links-page">
+  <main class="links-page" data-ark-theme="exa" data-ark-depth="minimal" data-ark-mode="editorial">
     <a href="/">← canvas</a>
     <h1>LINKS</h1>
     <div class="links-list">

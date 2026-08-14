@@ -1,0 +1,24 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const date = process.argv[2];
+if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) throw new Error('Usage: npm run daily:prepare-note -- YYYY-MM-DD');
+const privateRoot = fileURLToPath(new URL('../.helicase/daily/', import.meta.url));
+const publicRoot = fileURLToPath(new URL('../src/content/blog/daily/', import.meta.url));
+const report = await readFile(join(privateRoot, `${date}.md`), 'utf8');
+const block = report.match(/<!-- PUBLIC:START\n([\s\S]*?)\nPUBLIC:END -->/)?.[1];
+if (!block) throw new Error('The private report has no public candidate block.');
+const title = block.match(/^标题：\s*(.+)$/m)?.[1]?.trim();
+const summary = block.match(/^摘要：\s*(.+)$/m)?.[1]?.trim();
+const tags = block.match(/^标签：\s*(.*)$/m)?.[1]?.split(',').map(value => value.trim()).filter(Boolean) || [];
+const body = block.match(/^正文：\s*\n([\s\S]*)$/m)?.[1]?.trim();
+if (!title || !summary || !body) throw new Error('Fill 标题、摘要 and 正文 before preparing a public note.');
+const slug = title.normalize('NFKC').toLowerCase().replace(/[^\p{Letter}\p{Number}\s-]/gu, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 60);
+if (!slug) throw new Error('The title cannot produce a safe filename.');
+const target = join(publicRoot, `${date}-${slug}.md`);
+const quoted = value => `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+const markdown = `---\ntitle: ${quoted(title)}\ndate: ${date}\ncategory: daily\ntags: [${tags.map(quoted).join(', ')}]\nsummary: ${quoted(summary)}\ndraft: true\n---\n\n${body}\n`;
+await mkdir(publicRoot, { recursive: true });
+await writeFile(target, markdown, { encoding: 'utf8', flag: 'wx' });
+console.log(`Prepared public Notes draft (still private from the site): ${target}`);

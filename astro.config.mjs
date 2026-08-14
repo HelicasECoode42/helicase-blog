@@ -5,6 +5,8 @@ import { defineConfig } from 'astro/config';
 export default defineConfig({
   output: 'static',
   site: process.env.SITE_URL || 'https://helicase.pages.dev',
+  // Keep Astro 6's HTML-aware whitespace behavior during the v7 migration.
+  compressHTML: true,
 
   markdown: {
     shikiConfig: {

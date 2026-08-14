@@ -177,7 +177,8 @@
 
   // ── Init ──────────────────────────────
   const canvas = document.getElementById('debris-canvas') as HTMLCanvasElement;
-  if (canvas) {
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (canvas && !reducedMotion) {
     const debris = new DebrisField(canvas);
 
     // Pause when page not visible

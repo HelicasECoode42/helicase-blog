@@ -1,145 +1,209 @@
 # HELICASE
 
-一个公开只读的个人数字展厅，以及一个只在本地运行的 Studio。它展示技术项目、作品、兴趣和持续成长；Obsidian/Git 是内容源，不把整个私人 Vault 上传。
+> 一张由文章、项目、兴趣与真实活动组成的个人线索画布。
 
-## 日常工作流
+[访问网站](https://helicase.xin) · [文章](https://helicase.xin/blog) · [最近动态](https://helicase.xin/now) · [项目](https://helicase.xin/projects)
 
-```text
-Obsidian / Quick Capture
-  → Studio inbox
-  → approve for public
-  → npm run publish:captures
-  → npm run verify
-  → git push
-  → Cloudflare Workers Builds
+## 数据架构
+
+每类数据只有一个事实源：
+
+| 数据 | 唯一事实源 | 公开方式 |
+|---|---|---|
+| Articles / Notes | `src/content/blog/**/*.md` | Git 提交后由 Cloudflare 构建 |
+| Profile | `src/data/profile.json` | Studio Publish 或直接修改 Git |
+| Projects | `src/data/projects.json` | Studio Publish 或直接修改 Git |
+| Links | `src/data/links.json` | Studio Publish 或直接修改 Git |
+| Inspirations | `src/data/inspirations.json` | 修改 Git 后构建 |
+| GitHub 与手工活动 | `src/data/activity-history.json` | 追加同步后提交并构建 |
+| Favorites / Mood / Zine | Cloudflare D1 | Studio 保存后由公开 API 立即读取 |
+| Comments / 限流 / 用量 | Cloudflare D1 | Worker API |
+| Editor 草稿 | 浏览器 `localStorage` | 不公开、不同步、不备份 |
+| 私人日报与选定的 Codex 摘要 | `.helicase/` | 永不进入 Git；明确生成 Notes 草稿后才可能公开 |
+
+```mermaid
+flowchart LR
+  S["Studio private draft"] --> D["D1 site_settings"]
+  D -->|"Publish"| G["Git JSON / Markdown"]
+  G --> B["Cloudflare build"] --> P["Public static pages"]
+  I["Favorites / Mood / Zine"] --> C["D1 content"] --> A["Public API"] --> P
 ```
 
-### 启动本地 Studio
+`draft saved`、`published to GitHub`、`waiting for deployment`、`live` 是四个不同状态。D1 持久化草稿 revision、hash 和发布 commit；公开 `/build-meta.json` 保存构建 commit 与三个公开 JSON 的内容 hash。Studio 只有在已发布 hash 出现在公开构建中时才显示 Live，因此刷新页面或后续无关提交不会丢失或误判状态。
 
-终端 1：
+## GitHub 活动历史
+
+活动同步读取 GitHub Public Events，将原始记录以稳定事件 ID 追加到 `activity-history.json`：
 
 ```sh
-npm run studio:api
+npm run sync:activity-history
 ```
 
-终端 2：
+`.github/workflows/sync-activity-history.yml` 每天北京时间 22:30 自动执行同一命令，也支持在 GitHub Actions 手动触发。只有历史文件确实变化时才提交到 `main`；该提交随后触发 Cloudflare 构建。
 
-```sh
-npm run dev
-```
+同步规则：
 
-访问 `http://localhost:4321/studio`。Quick Capture 写入本机 `.helicase/studio-state.json`，该文件已被 Git 忽略。Studio 中点击 `approve for public` 后运行：
+- 使用 `github:<event.id>` 去重；
+- 保存精确 `occurredAt`，页面按 Asia/Shanghai 聚合；
+- 保留 400 天；
+- API 失败发生在写入前，不破坏旧历史；
+- 同步锁阻止并发覆盖；
+- 临时文件加原子替换，避免半写入；
+- 没有变化时不写文件、不制造空提交。
 
-```sh
-npm run publish:captures
-```
+首页与 `/now` 共用 `src/lib/activity-feed.ts`，统一合并活动历史和公开 Markdown 发布事件。
 
-仅 `项目进展`、`学习记录` 和 `灵感` 可自动进入公开活动/灵感数据；图片和新文章必须人工检查后再发布，避免私密素材误公开。
+## Projects 状态
 
-### 项目、灵感与活动数据
+Projects 不使用由提交数猜测的完成百分比。`status` 表示项目是否 active / paused / archived，`phase` 表示 exploring / building / validating / maintaining；`current` 和 `next` 保持人工表达。只有存在明确分母时才填写 `milestone.completed / milestone.total`。
 
-- `src/data/projects.ts`：公开项目、状态、下一步、技术栈。
-- `src/data/activities.ts`：网站自身真实活动，驱动 `/now` 热力图。
-- `src/data/inspirations.ts`：公开灵感索引。
-- `src/data/links.ts`：友链；只需添加 `name`、`note`、`url`。
-- `src/data/integrations.json`：GitHub、LeetCode 的可选公开数据同步配置，默认关闭。
+项目可通过 `githubRepos` 关联公开 GitHub 仓库。页面从 `activity-history.json` 自动推导最后活动日期和最近 7/30 天动作数；同步脚本不会改写项目定位、阶段、焦点或下一步。
 
-开启 GitHub 或 LeetCode 后执行：
+## 写作与发布
 
-```sh
-npm run sync:activity
-```
-
-该命令只请求公开活动，不使用令牌；若第三方接口不可用，旧数据保持不变。LeetCode 并没有稳定的官方公开活动 API，因此它是可选的、可随时移除的视觉补充，网站热力图本身始终以你的真实网站/项目活动为核心。
-
-### 写文章
+创建文章或 Notes：
 
 ```sh
 npm run new:post -- tech "文章标题"
+npm run new:note -- "Notes 标题"
 ```
 
-新文章默认是草稿。完成 `summary` 后把 `draft` 改为 `false`。本地 `/editor` 的快捷键：
-
-- `Cmd/Ctrl + S`：保存浏览器草稿。
-- `Cmd/Ctrl + Enter`：校验并导出 Markdown。
-- `Cmd/Ctrl + B/I/K`：粗体、斜体、链接。
-
-浏览器草稿仅是临时保护，不是发布内容或版本备份。
-
-#### 安全发布清单
-
-1. 文章必须放入 `src/content/blog/<tech|daily|reviews>/`；浏览器 Editor 的导出文件不会自动上线。
-2. 写作期间保持 `draft: true`。草稿不会进入首页、归档、详情、搜索、RSS 或 sitemap。
-3. 完成标题、摘要、标签和正文后，将 `draft` 改为 `false`。
-4. 运行 `npm run verify`。公开文章的摘要仍为 `TODO` 时验证会失败。
-5. 打开 `/blog` 搜索文章标题或正文词，确认分类、详情页和前后篇导航正确。
-6. 提交并推送后由 Cloudflare Workers Builds 构建；不要上传整个 Obsidian Vault、`.helicase/`、`.env` 或密钥。
-
-完整开发与安全边界见 [`DEVELOPMENT-CONTRACT.md`](./DEVELOPMENT-CONTRACT.md)。
-
-## 验证与部署
+新文件默认 `draft: true`。发布前完成摘要和正文、移除或改为 `draft: false`，再运行：
 
 ```sh
 npm run verify
 ```
 
-Cloudflare Workers Builds：
+线上 `/editor` 可通过受保护的 GitHub Contents API 写入 Markdown。它的浏览器自动保存只属于 `localStorage`，不能视为已发布。
 
-- Production branch：`main`
-- Build command：`npm run verify`
-- Deploy command：`npx wrangler deploy`
-- Root directory：`/`
-- Build variable：`NODE_VERSION=22.12.0`
-- Build variable：`SITE_URL=https://<最终 workers.dev 或自定义域名>`
-- 强制 HTTPS：开启
-- 生产域名：`https://helicase.xin`（由 `wrangler.toml` 的 custom domain route 管理）
+## 私人日报工作流
 
-如果当前 Cloudflare Zero Trust 需要绑定银行卡，可暂时使用 Worker Basic Auth：在 Worker **Settings → Variables and Secrets** 中新增 `STUDIO_USERNAME`、`STUDIO_PASSWORD` 两个 Secret。Worker 会保护 `/studio*` 与 `/editor*`；真实密码不要提交到 Git，也不要复用在其他服务。
+日报把自动事实整理和个人表达分开。它不会扫描所有 Codex 对话；只有你明确加入的工作摘要才进入日报。
 
-`/editor` 的 `publish →` 需要另外配置 GitHub Secrets：`GITHUB_CONTENT_TOKEN`（仅目标仓库 Contents 读写权限）、`GITHUB_OWNER=HelicasECoode42`、`GITHUB_REPO=helicase-blog`。配置后，发布按钮会将 Markdown 写入 `src/content/blog/<category>/`，再由 GitHub/Cloudflare 自动构建；未配置时只使用 `export ↓` 下载文件。
-
-`wrangler.toml` 使用 Worker + Static Assets：只有 `/api/*` 进入 `worker/index.ts`，其他路由直接读取 `dist`。`public/_headers` 已包含 CSP、HSTS、点击劫持防护、MIME 嗅探防护、Referrer Policy 与 Permissions Policy。不要提交 `.env`、`.dev.vars`、模型 API Key、Obsidian Vault 或 `.helicase/studio-state.json`。
-
-OC 对话已经由 `/api/oc-chat` Worker 代理，并限制方法、请求体、消息数量、单条长度、总长度与上游超时。
-
-### D1、Turnstile 与审核
-
-当前生产环境已绑定 D1：`helicase-blog-data`（binding `DB`，APAC），并已应用 `migrations/0001_public_space.sql`。`/api/content/mood` 已在 `https://helicase.xin` 实测返回 `200`；Favorites、Moodboard、Zine、评论审核、OC 限流和每日预算均可直接使用。
-
-如果需要在新账号或新环境复建，再创建 D1、在 `wrangler.toml` 添加 `[[d1_databases]]` 的 `database_id`，并执行：
+主动加入一条工作上下文：
 
 ```sh
-npx wrangler d1 migrations apply helicase-blog-data --remote
+npm run daily:add-context -- "把活动数据迁移到唯一历史源，完成了失败保护"
 ```
 
-Turnstile 尚待在 Cloudflare 控制台创建 widget：将 Secret 设为 Worker Secret `TURNSTILE_SECRET_KEY`，将 Site Key 设为 Cloudflare Builds 的 `PUBLIC_TURNSTILE_SITE_KEY`。Secret 存在时，OC 和评论会强制校验 Turnstile。即使尚未配置 Turnstile，D1 已执行 OC 每 IP 10 次/小时、每日预算（`OC_DAILY_LIMIT`，默认 100）、评论每 IP 5 次/小时；评论先进入 `pending`，只能由 `/studio` 审核公开。
+收集当天日报：
 
-完整 Worker 打包检查：
+```sh
+npm run daily:collect
+```
+
+结果保存在 `.helicase/daily/YYYY-MM-DD.md`：
+
+1. 脚本写入 GitHub 与手工活动证据；
+2. 你补充“我的心得”；
+3. Codex 根据整份日报填写“Codex 复盘”；
+4. 你决定是否填写“公开候选”；
+5. 生成公开 Notes 草稿：
+
+```sh
+npm run daily:prepare-note -- YYYY-MM-DD
+```
+
+这个命令只生成 `draft: true` 的 Markdown，不会提交、推送或公开。公开仍需要一次明确确认。
+
+## Studio
+
+生产 `/studio` 与 `/editor` 由 Worker Basic Auth 保护。
+
+- Favorites / Mood / Zine：保存到 D1 后立即成为公开 API 数据；
+- Profile / Links / Projects：Save Draft 只写私有 D1；Publish 才写 GitHub；
+- 初次没有 D1 草稿时，Studio 会加载当前构建中的公开 JSON 作为编辑起点；
+- Save Draft 必须携带 `expectedRevision`，两个窗口不会静默覆盖；
+- Publish 同时校验 revision、草稿 hash 与 GitHub 文件 SHA；
+- D1 保存 `published_hash`、`published_commit_sha` 和 `published_at`，刷新 Studio 后仍可恢复发布状态。
+
+生产 Worker Secrets：
+
+- `STUDIO_USERNAME`
+- `STUDIO_PASSWORD`
+- `GITHUB_CONTENT_TOKEN`
+- `GITHUB_OAUTH_CLIENT_SECRET`
+- `SESSION_SECRET`
+- `RATE_LIMIT_SALT`
+- `TURNSTILE_SECRET_KEY`
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_MODEL`（可选，默认 `deepseek-chat`）
+
+生产 Worker Variables：
+
+- `GITHUB_OWNER`
+- `GITHUB_REPO`
+- `GITHUB_OAUTH_CLIENT_ID`
+- `OC_DAILY_LIMIT`
+
+构建环境 Variables：
+
+- `SITE_URL`
+- `PUBLIC_TURNSTILE_SITE_KEY`
+
+本地示例值见 `.dev.vars.example` 与 `.env.example`。`GITHUB_CONTENT_TOKEN` 使用只允许目标仓库 Contents 读写的 fine-grained token；`SESSION_SECRET` 与 `RATE_LIMIT_SALT` 应使用独立随机值。
+
+## 本地开发与验证
+
+要求 Node.js `>=22.12.0`：
+
+```sh
+npm install
+npm run dev
+```
+
+完整静态验证：
+
+```sh
+npm run verify
+```
+
+它依次验证文章、公开 JSON、Astro 类型、构建、内部链接、隐私标记、活动来源、内容 hash 和首页/Now 一致性。
+
+Worker dry-run：
 
 ```sh
 npm run check:worker
 ```
 
-本地运行真实 Worker 路由（不同于只提供静态页面的 `npm run dev`）：
+它还会在隔离的临时 D1 与假 GitHub API 上复现：Basic Auth、`0001 → 0003` migration、草稿 CAS、发布冲突、发布状态持久化和新私有草稿。单独运行：
 
 ```sh
-npm run dev:worker
+npm run smoke:worker
 ```
 
-## 数据边界与维护
+## 部署
 
-- Markdown 文章和 `src/data/` 是公开站点的构建期数据；修改后必须重新构建和部署。
-- Editor 草稿和 OS 布局使用 `localStorage`，只存在当前浏览器。Favorites、Moodboard、Zine 和评论已迁移到 D1；D1 尚未配置时这些公开区会显示为空而不会回退到访客浏览器数据。
-- Studio 使用本机 `127.0.0.1:4317` API 和 `.helicase/studio-state.json`；捕获内容只有在批准并运行相应发布脚本后才可能进入公开数据。
-- `publish:profile` 会拒绝超长字段、不安全协议和异常结构；社交链接必须是 HTTPS，头像必须是 HTTPS 或 `/images/...` 站内路径。
-- 每次发布前运行 `npm run check:worker`。定期运行 `npm audit`；当前低危告警属于开发工具依赖，破坏性升级应在单独迁移分支处理。
-- 音乐页及其播放器已移除；兴趣区目前聚焦收藏、Zine 与 Moodboard。
-- Cloudflare Workers、Zero Trust、域名、DNS 和 Secrets 属于外部账号配置；本地代码无法证明它们已经正确启用，上线前需在 Cloudflare 控制台单独核验。
+- Astro 输出静态页面；
+- Cloudflare Worker 处理受保护 API、D1 与 Static Assets；
+- `main` 分支触发生产构建；
+- `build-meta.json` 记录构建对应的 Git commit、源码是否干净及公开设置内容 hash；
+- 自定义域名为 [helicase.xin](https://helicase.xin)。
 
-### 环境变量
+手动部署命令：
 
-- `.env`：本地 Node 脚本设置；`HELICASE_STUDIO_PORT` 默认 `4177`。本地指定 canonical 时使用 `SITE_URL=https://... npm run verify`；Cloudflare Builds 直接注入 `SITE_URL`。
-- `.dev.vars`：本地 Worker 密钥；当前只有 OC 联网对话使用的 `DEEPSEEK_API_KEY`。
-- 两个真实文件都已被 Git 忽略。可提交模板是 `.env.example` 和 `.dev.vars.example`。
-- Cloudflare 线上环境不要上传 `.dev.vars`；在 Worker 的 **Settings → Variables and Secrets** 中新增同名 Secret。
-- `GITHUB_TOKEN`、Vectorize 和 Workers AI 绑定要等发布/embedding 后端实现后再配置；当前代码不会读取它们。D1 已在生产环境配置完成。
+```sh
+npm run deploy
+```
+
+该命令会拒绝非 `main`、未提交、未推送、旧 `dist` 或脏源码构建，然后重新执行完整验证和 Worker smoke，最后才调用 Wrangler。生产发布后运行：
+
+```sh
+npm run smoke:site -- https://helicase.xin
+```
+
+远端数据库迁移、Secrets/OAuth 配置和上线浏览器检查仍是显式生产操作，完整顺序见 `docs/PRODUCTION-CHECKLIST.md`。
+
+## 隐私边界
+
+- `.helicase/`、`.env`、`.dev.vars`、Cookie 和令牌不得进入 Git 或构建产物；
+- Codex 对话默认不进入日报，必须主动添加摘要；
+- 私人日报不会自动变成公开文章；
+- 需要密钥的能力只在 Worker 服务端运行；
+- GitHub OAuth access token 不持久化到站点数据库。
+
+详细约束见 [DEVELOPMENT-CONTRACT.md](./DEVELOPMENT-CONTRACT.md)。
+
+## License
+
+[MIT](./LICENSE)

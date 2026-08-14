@@ -7,6 +7,7 @@
 // ============================================
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import CommentSection from '../../components/CommentSection.astro';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog', ({ data }) => !data.draft);
@@ -40,7 +41,7 @@ const tocHeadings = headings.filter(h => h.depth <= 3);
 ---
 
 <BaseLayout title={title} description={summary} type="article">
-  <script type="application/ld+json" set:html={JSON.stringify({
+  <script is:inline type="application/ld+json" set:html={JSON.stringify({
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: title,
@@ -50,7 +51,7 @@ const tocHeadings = headings.filter(h => h.depth <= 3);
     keywords: tags.join(', '),
     author: { '@type': 'Person', name: 'HelicasE' },
     mainEntityOfPage: new URL(Astro.url.pathname, Astro.site ?? 'https://helicase.pages.dev').href,
-  })} />
+  })}></script>
   <!-- Reading progress bar -->
   <div class="article-progress"><div class="article-progress-bar" id="progress-bar"></div></div>
 
@@ -125,6 +126,8 @@ const tocHeadings = headings.filter(h => h.depth <= 3);
         )}
       </nav>
     )}
+
+    <CommentSection target={post.id.replace(/\//g, '-')} />
   </div>
 
   <script>

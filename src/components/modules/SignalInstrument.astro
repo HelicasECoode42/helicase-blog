@@ -1,0 +1,260 @@
+---
+interface DaySignal {
+  date: string;
+  label: string;
+  count: number;
+}
+
+interface FocusSignal {
+  name: string;
+  phase: string;
+  current: string;
+  href: string;
+}
+
+interface LatestSignal {
+  date: string;
+  title: string;
+}
+
+interface Props {
+  days: DaySignal[];
+  focus: FocusSignal;
+  latest: LatestSignal | null;
+  activeProjects: number;
+  archiveSize: number;
+}
+
+const { days, focus, latest, activeProjects, archiveSize } = Astro.props;
+const peak = Math.max(1, ...days.map(day => day.count));
+const total = days.reduce((sum, day) => sum + day.count, 0);
+---
+
+<section class="signal-instrument" data-ark-theme="exa" data-ark-depth="moderate" aria-labelledby="signal-instrument-heading">
+  <header class="instrument-head">
+    <div>
+      <span class="instrument-kicker">PERSONAL ORBIT</span>
+      <h2 id="signal-instrument-heading">CURRENT SIGNAL</h2>
+    </div>
+    {latest && (
+      <a class="latest-log" href="/now" data-activity-date={latest.date} data-activity-title={latest.title}>
+        LAST TRACE · {latest.date.slice(5)}
+      </a>
+    )}
+  </header>
+
+  <div class="instrument-stage">
+    <a class="focus-orbit" href={focus.href} aria-label={`Open ${focus.name} project`}>
+      <span class="orbit orbit-outer" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="orbit orbit-inner" aria-hidden="true"><i></i><i></i></span>
+      <span class="orbit-core" aria-hidden="true"></span>
+      <span class="focus-copy">
+        <small>FOCUS / {focus.phase}</small>
+        <strong>{focus.name}</strong>
+        <em>{focus.current}</em>
+      </span>
+    </a>
+
+    <div class="instrument-data">
+      <article class="pulse-widget" aria-label={`Seven day activity: ${total} actions`}>
+        <div class="widget-label"><span>7D PULSE</span><strong>{String(total).padStart(2, '0')}</strong></div>
+        <div class="pulse-bars" aria-hidden="true">
+          {days.map(day => (
+            <span class="pulse-day" title={`${day.date}: ${day.count}`}>
+              <i style={`--signal-level:${Math.max(.08, day.count / peak)}`}></i>
+              <small>{day.label}</small>
+            </span>
+          ))}
+        </div>
+      </article>
+
+      <article class="archive-widget">
+        <div><strong>{String(activeProjects).padStart(2, '0')}</strong><span>ACTIVE<br />TRACKS</span></div>
+        <div><strong>{String(archiveSize).padStart(2, '0')}</strong><span>PUBLIC<br />RECORDS</span></div>
+        <a href="/now" aria-label="Open activity archive">ARCHIVE ↗</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<style>
+  .signal-instrument {
+    --instrument-signal: var(--color-blue);
+    --instrument-rule: color-mix(in srgb, var(--color-silver-light) 82%, transparent);
+    min-width: 0;
+    padding-top: 5px;
+    font-family: var(--font-mono);
+  }
+
+  .instrument-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--instrument-rule);
+  }
+
+  .instrument-kicker,
+  .instrument-head a {
+    display: block;
+    font-size: .62rem;
+    letter-spacing: .14em;
+    color: var(--color-silver);
+  }
+
+  .instrument-head h2 {
+    margin-top: 4px;
+    font: 600 .66rem/1 var(--font-mono);
+    letter-spacing: .16em;
+    color: var(--instrument-signal);
+  }
+
+  .instrument-head a:hover { color: var(--instrument-signal); }
+
+  .instrument-stage {
+    display: grid;
+    grid-template-columns: minmax(198px, 1.12fr) minmax(160px, .88fr);
+    gap: 10px;
+    min-height: 146px;
+    padding-top: 10px;
+  }
+
+  .focus-orbit {
+    position: relative;
+    min-height: 146px;
+    overflow: hidden;
+    border-left: 1px solid var(--instrument-rule);
+    background:
+      linear-gradient(90deg, color-mix(in srgb, var(--instrument-signal) 4%, transparent), transparent 64%),
+      radial-gradient(circle at 30% 50%, color-mix(in srgb, var(--instrument-signal) 7%, transparent), transparent 40%);
+  }
+
+  .orbit {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    width: 108px;
+    aspect-ratio: 1;
+    border: 1px solid color-mix(in srgb, var(--instrument-signal) 27%, transparent);
+    border-radius: 50%;
+    transform: translateY(-50%);
+  }
+
+  .orbit::before,
+  .orbit::after {
+    content: '';
+    position: absolute;
+    inset: 12px -7px;
+    border-top: 1px solid var(--instrument-rule);
+    border-bottom: 1px solid var(--instrument-rule);
+    border-radius: 50%;
+    transform: rotate(-22deg);
+  }
+
+  .orbit::after { inset: -7px 12px; transform: rotate(22deg); }
+
+  .orbit-inner {
+    left: 32px;
+    width: 68px;
+    border-style: dashed;
+    animation: orbit-turn 18s linear infinite;
+  }
+
+  .orbit-inner::before,
+  .orbit-inner::after { display: none; }
+
+  .orbit i {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border: 1px solid var(--instrument-signal);
+    border-radius: 50%;
+    background: var(--color-canvas);
+  }
+  .orbit-outer i:nth-child(1) { left: 17px; top: 11px; }
+  .orbit-outer i:nth-child(2) { right: -3px; top: 57px; background: var(--instrument-signal); }
+  .orbit-outer i:nth-child(3) { left: 36px; bottom: -2px; }
+  .orbit-inner i:nth-child(1) { left: 7px; top: 12px; }
+  .orbit-inner i:nth-child(2) { right: 5px; bottom: 12px; background: var(--instrument-signal); }
+
+  .orbit-core {
+    position: absolute;
+    left: 66px;
+    top: 50%;
+    width: 12px;
+    aspect-ratio: 1;
+    transform: translate(-50%, -50%) rotate(45deg);
+    background: var(--instrument-signal);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--instrument-signal) 8%, transparent);
+  }
+
+  .focus-copy {
+    position: absolute;
+    inset: auto 12px 13px 130px;
+    min-width: 0;
+  }
+
+  .focus-copy small,
+  .focus-copy strong,
+  .focus-copy em { display: block; }
+  .focus-copy small { font-size: .62rem; letter-spacing: .12em; color: var(--instrument-signal); }
+  .focus-copy strong { margin-top: 5px; font: 600 .88rem/1 var(--font-body); }
+  .focus-copy em { margin-top: 7px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 400 .72rem/1.4 var(--font-body); font-style: normal; color: var(--color-silver); }
+  .focus-orbit:hover .focus-copy strong { color: var(--instrument-signal); }
+
+  .instrument-data { display: grid; grid-template-rows: 1fr auto; gap: 8px; }
+  .pulse-widget,
+  .archive-widget { border-top: 1px solid var(--instrument-rule); border-bottom: 1px solid var(--instrument-rule); }
+  .pulse-widget { padding: 8px 8px 6px; }
+  .widget-label { display: flex; justify-content: space-between; align-items: baseline; }
+  .widget-label span { font-size: .62rem; letter-spacing: .13em; color: var(--color-silver); }
+  .widget-label strong { font-size: .7rem; color: var(--instrument-signal); font-variant-numeric: tabular-nums; }
+  .pulse-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; height: 48px; margin-top: 7px; }
+  .pulse-day { display: grid; grid-template-rows: 1fr auto; gap: 4px; min-width: 0; }
+  .pulse-day i { align-self: end; height: calc(var(--signal-level) * 32px); min-height: 3px; background: var(--instrument-signal); opacity: .72; transform-origin: bottom; animation: signal-rise .6s var(--ease-mechanical) both; }
+  .pulse-day:nth-child(2n) i { opacity: .38; }
+  .pulse-day small { text-align: center; font-size: .6rem; color: var(--color-silver); }
+
+  .archive-widget { display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 7px; min-height: 44px; padding: 6px 8px; }
+  .archive-widget>div { display: flex; align-items: center; gap: 6px; }
+  .archive-widget strong { font: 500 .86rem/1 Georgia, var(--font-body); color: var(--instrument-signal); font-variant-numeric: tabular-nums; }
+  .archive-widget span { font-size: .37rem; line-height: 1.35; letter-spacing: .08em; color: var(--color-silver); }
+  .archive-widget a { font-size: .6rem; letter-spacing: .1em; color: var(--color-silver); }
+  .archive-widget a:hover { color: var(--instrument-signal); }
+
+  @keyframes orbit-turn { to { transform: translateY(-50%) rotate(360deg); } }
+  @keyframes signal-rise { from { transform: scaleY(0); } }
+
+  @media (max-width: 1100px) {
+    .instrument-stage { grid-template-columns: 1fr; }
+    .instrument-data { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+    .archive-widget { grid-template-columns: 1fr 1fr; }
+    .archive-widget>a { display: none; }
+  }
+
+  @media (max-width: 767px) {
+    .instrument-stage { grid-template-columns: minmax(0, 1.05fr) minmax(170px, .95fr); min-height: 150px; }
+    .focus-orbit { min-height: 150px; }
+    .instrument-data { display: grid; grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+    .focus-copy { inset-inline: 132px 10px; }
+    .orbit { left: 8px; width: 112px; }
+    .orbit-inner { left: 29px; width: 70px; }
+    .orbit-core { left: 64px; }
+  }
+
+  @media (max-width: 540px) {
+    .instrument-stage { grid-template-columns: 1fr; }
+    .instrument-data { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+  }
+
+  @media (orientation: portrait) and (min-width: 541px) and (max-width: 900px) {
+    .instrument-stage { grid-template-columns: minmax(0, 1.05fr) minmax(170px, .95fr); }
+    .instrument-data { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orbit-inner,
+    .pulse-day i { animation: none; }
+  }
+</style>

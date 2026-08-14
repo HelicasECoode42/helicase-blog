@@ -489,4 +489,5 @@
 @media (max-width: 767px) {
   .os-mobile-banner { display: flex; }
   .os-desktop > * { display: none; }
+  .os-desktop > .os-mobile-banner { display: flex; }
 }

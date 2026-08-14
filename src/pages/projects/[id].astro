@@ -1,0 +1,96 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import projects from '../../data/projects.json';
+import { getProjectActivity, getProjectHistory } from '../../lib/project-activity';
+import { shanghaiDateKey } from '../../lib/activity-feed';
+
+export function getStaticPaths() {
+  return projects
+    .filter(project => project.visibility === 'public')
+    .map(project => ({ params: { id: project.id }, props: { project } }));
+}
+
+const { project } = Astro.props;
+const activity = getProjectActivity(project);
+const history = getProjectHistory(project, 8);
+const eventLabel = (kind: string, action: string, count: number) => {
+  if (kind === 'push') return `${count} COMMIT${count > 1 ? 'S' : ''}`;
+  if (kind === 'pull_request') return `PR · ${action}`;
+  if (kind === 'issue') return `ISSUE · ${action}`;
+  if (kind === 'discussion') return 'DISCUSSION';
+  if (kind === 'release') return `RELEASE · ${action}`;
+  return `${kind} · ${action}`;
+};
+---
+
+<BaseLayout title={project.name} description={project.summary}>
+  <main class="project-page">
+    <a class="back" href="/projects">← CORE PROJECTS</a>
+
+    <header class="project-hero">
+      <div class="project-meta">
+        <span>{project.status} · {project.phase}</span>
+        <span>{project.type}</span>
+      </div>
+      <h1>{project.name}</h1>
+      <p>{project.summary}</p>
+      <div class="project-stack">{project.stack.map(item => <span>{item}</span>)}</div>
+    </header>
+
+    <section class="project-direction" aria-label="Current project direction">
+      <article><span>CURRENT FOCUS</span><p>{project.current}</p></article>
+      <article><span>NEXT OUTCOME</span><p>{project.next}</p></article>
+    </section>
+
+    <section class="project-proof" aria-labelledby="project-proof-heading">
+      <div class="section-heading">
+        <div><span>TRACEABLE EVIDENCE</span><h2 id="project-proof-heading">PROJECT PULSE</h2></div>
+        {activity.lastActivityDate && <small>LAST ACTIVE · {activity.lastActivityDate}</small>}
+      </div>
+
+      <div class="pulse-grid">
+        {'milestone' in project && project.milestone && (
+          <article><span>MILESTONE</span><strong>{project.milestone.name}</strong><em>{project.milestone.completed} / {project.milestone.total} tasks</em></article>
+        )}
+        {activity.lastActivityDate && (
+          <article data-project-activity={JSON.stringify(activity.activitySeries)}>
+            <span>GITHUB ACTIVITY</span>
+            <strong><output data-project-days="7">{activity.last7Days}</output> actions / 7d</strong>
+            <em><output data-project-days="30">{activity.last30Days}</output> actions / 30d</em>
+          </article>
+        )}
+      </div>
+
+      {history.length > 0 ? (
+        <ol class="history-list">
+          {history.map(item => (
+            <li>
+              <a href={item.url}>
+                <time>{shanghaiDateKey(item.occurredAt)}</time>
+                <span>{eventLabel(item.kind, item.action, item.count)}</span>
+                <p>{item.title || item.repository}</p>
+              </a>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p class="empty-proof">公开证据正在整理；当前方向与下一步仍由本人维护，不用提交数量代替进度。</p>
+      )}
+    </section>
+
+    {(project.links.length > 0 || project.notes.length > 0 || project.noteHint) && (
+      <section class="project-links" aria-labelledby="project-links-heading">
+        <div class="section-heading"><div><span>FOLLOW THE THREAD</span><h2 id="project-links-heading">LINKS & NOTES</h2></div></div>
+        <div>
+          {project.links.map(link => <a href={link.url}>{link.label} →</a>)}
+          {project.notes.map(note => <a href={note.url}>{note.label} →</a>)}
+          {project.noteHint && <span>{project.noteHint}</span>}
+        </div>
+      </section>
+    )}
+  </main>
+</BaseLayout>
+
+<style>
+  .project-page{max-width:920px;margin:0 auto;padding:48px 24px 110px}.back{font:9px var(--font-mono);letter-spacing:.14em;color:var(--color-silver)}.back:hover{color:var(--color-blue)}.project-hero{margin:48px 0 58px}.project-meta{display:flex;justify-content:space-between;gap:20px;font:9px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--color-blue)}.project-meta span:last-child{color:var(--color-silver)}h1{margin:14px 0 18px;font:600 clamp(2.7rem,8vw,5.6rem)/.95 var(--font-body);letter-spacing:-.045em}.project-hero>p{max-width:700px;font-size:1.05rem;line-height:1.8;color:var(--color-text-secondary)}.project-stack{display:flex;flex-wrap:wrap;gap:8px;margin-top:25px}.project-stack span{padding:5px 8px;border:1px solid var(--color-silver-light);font:9px var(--font-mono)}.project-direction{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--color-silver-light);border:1px solid var(--color-silver-light);margin-bottom:70px}.project-direction article{background:rgba(245,246,248,.96);padding:26px}.project-direction span,.section-heading span,.pulse-grid span{font:8px var(--font-mono);letter-spacing:.16em;color:var(--color-silver)}.project-direction p{margin-top:10px;line-height:1.65}.section-heading{display:flex;align-items:end;justify-content:space-between;gap:24px;padding-bottom:12px;border-bottom:1px solid var(--color-deep-blue)}.section-heading h2{margin-top:7px;font:600 1rem var(--font-mono);letter-spacing:.16em}.section-heading small{font:8px var(--font-mono);letter-spacing:.12em;color:var(--color-blue)}.pulse-grid{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0 30px}.pulse-grid article{min-width:220px;padding:12px 14px;border-left:2px solid var(--color-blue);background:color-mix(in srgb,var(--color-blue) 4%,transparent);font-family:var(--font-mono)}.pulse-grid span,.pulse-grid strong,.pulse-grid em{display:block}.pulse-grid strong{margin-top:7px;font-size:11px}.pulse-grid em{margin-top:4px;font-size:9px;font-style:normal;color:var(--color-silver)}.history-list{list-style:none;margin:0;padding:0}.history-list li{border-top:1px solid var(--color-silver-light)}.history-list a{display:grid;grid-template-columns:92px 110px minmax(0,1fr);gap:18px;align-items:baseline;padding:13px 0}.history-list time,.history-list span{font:8px var(--font-mono);letter-spacing:.08em;color:var(--color-silver)}.history-list span{color:var(--color-blue)}.history-list p{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:.8rem}.history-list a:hover p{color:var(--color-blue)}.empty-proof{padding:24px 0;color:var(--color-silver);font:10px/1.8 var(--font-mono)}.project-links{margin-top:70px}.project-links>.section-heading{margin-bottom:18px}.project-links>div:last-child{display:flex;flex-wrap:wrap;gap:10px 20px}.project-links a,.project-links div>span{font:10px var(--font-mono);color:var(--color-silver)}.project-links a:hover{color:var(--color-blue)}@media(max-width:640px){.project-page{padding:36px 16px 80px}.project-hero{margin-top:38px}.project-direction{grid-template-columns:1fr}.section-heading{align-items:flex-start;flex-direction:column}.history-list a{grid-template-columns:80px minmax(0,1fr);gap:8px 12px}.history-list p{grid-column:1/-1;white-space:normal}.project-meta{align-items:flex-start;flex-direction:column;gap:7px}}
+</style>

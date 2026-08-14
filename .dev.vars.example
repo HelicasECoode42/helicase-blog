@@ -1,6 +1,18 @@
 # Copy this file to .dev.vars for local Worker development.
 # Never commit the copied file or a real secret.
 DEEPSEEK_API_KEY=replace_with_your_local_secret
+# Optional. Defaults to deepseek-chat; keep the navigation model deterministic.
+DEEPSEEK_MODEL=deepseek-chat
 TURNSTILE_SECRET_KEY=replace_with_turnstile_secret
+# Local development only. Never set this in production.
+ALLOW_INSECURE_TURNSTILE_BYPASS=false
 RATE_LIMIT_SALT=replace_with_a_long_random_string
 OC_DAILY_LIMIT=100
+GITHUB_OAUTH_CLIENT_ID=replace_with_github_oauth_client_id
+GITHUB_OAUTH_CLIENT_SECRET=replace_with_github_oauth_client_secret
+SESSION_SECRET=replace_with_at_least_32_random_bytes
+STUDIO_USERNAME=replace_with_studio_username
+STUDIO_PASSWORD=replace_with_studio_password
+GITHUB_CONTENT_TOKEN=replace_with_fine_grained_contents_token
+GITHUB_OWNER=HelicasECoode42
+GITHUB_REPO=helicase-blog

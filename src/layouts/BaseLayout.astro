@@ -64,7 +64,6 @@ const socialImage = new URL(image, Astro.site ?? 'https://helicase.pages.dev');
         <a href="/interests">interests</a>
         <a href="/links">links</a>
         <a href="/oc">oc</a>
-        <a href="/studio" class="author-only">studio</a>
         <a href="/about">about</a>
       </div>
     </nav>
@@ -116,9 +115,6 @@ const socialImage = new URL(image, Astro.site ?? 'https://helicase.pages.dev');
 
   /* Push content below the fixed index. */
   body { padding-top: 36px; }
-  .author-only { display: none !important; }
-  html.local-author .author-only { display: inline-flex !important; }
-
   @media (max-width: 700px) {
     .topnav { left: 0; bottom: auto; align-items: center; gap: 12px; }
     .topnav-links { flex-direction: row; gap: 11px; max-width: calc(100vw - 118px); overflow-x: auto; scrollbar-width: none; }
@@ -134,13 +130,6 @@ const socialImage = new URL(image, Astro.site ?? 'https://helicase.pages.dev');
 
 <script is:inline>
   (function () {
-    function markLocalAuthor() {
-      var local = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-      document.documentElement.classList.toggle('local-author', local);
-    }
-    document.addEventListener('astro:page-load', markLocalAuthor);
-    markLocalAuthor();
-
     // ClientRouter swaps page DOM. Keep the homepage clock independent from a
     // component script so returning to `/` always rehydrates a live display.
     function refreshHomeClock() {
@@ -155,5 +144,26 @@ const socialImage = new URL(image, Astro.site ?? 'https://helicase.pages.dev');
     }
     document.addEventListener('astro:page-load', startHomeClock);
     startHomeClock();
+
+    // Rolling project activity windows age in the browser. A quiet day does
+    // not need an empty Git commit merely to turn "7 days" into "6 days".
+    function refreshProjectActivity() {
+      document.querySelectorAll('[data-project-activity]').forEach(function (node) {
+        var series;
+        try { series = JSON.parse(node.getAttribute('data-project-activity') || '[]'); }
+        catch (_) { return; }
+        node.querySelectorAll('[data-project-days]').forEach(function (output) {
+          var days = Number(output.getAttribute('data-project-days'));
+          var cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+          var count = series.reduce(function (total, event) {
+            var occurredAt = Date.parse(event[0]);
+            return occurredAt >= cutoff && occurredAt <= Date.now() ? total + Math.max(1, Number(event[1]) || 1) : total;
+          }, 0);
+          output.textContent = String(count);
+        });
+      });
+    }
+    document.addEventListener('astro:page-load', refreshProjectActivity);
+    refreshProjectActivity();
   })();
 </script>

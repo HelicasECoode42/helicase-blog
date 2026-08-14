@@ -1,0 +1,130 @@
+---
+interface Props { target: string; }
+const { target } = Astro.props;
+---
+
+<section class="comments" data-comments data-target={target}>
+  <header class="comments__header">
+    <div>
+      <span class="comments__eyebrow">RESPONSES</span>
+      <h2>评论</h2>
+    </div>
+    <span class="comments__count" data-comment-count>—</span>
+  </header>
+
+  <div class="comments__session" data-session>
+    <span>正在确认登录状态…</span>
+  </div>
+
+  <form class="comments__form" data-comment-form hidden>
+    <label for={`comment-${target}`}>留下你的想法</label>
+    <textarea id={`comment-${target}`} name="body" maxlength="1000" rows="4" placeholder="认真交流，友善表达。" required></textarea>
+    <div class="comments__form-footer">
+      <span data-comment-status aria-live="polite"></span>
+      <button type="submit">发布评论</button>
+    </div>
+  </form>
+
+  <div class="comments__list" data-comment-list aria-live="polite">
+    <p class="comments__empty">正在加载评论…</p>
+  </div>
+</section>
+
+<script>
+  interface CommentItem { id: string; author: string; body: string; avatar_url?: string; author_url?: string; created_at: string; }
+
+  function initializeComments() {
+    document.querySelectorAll<HTMLElement>('[data-comments]').forEach((root) => {
+      if (root.dataset.ready === 'true') return;
+      root.dataset.ready = 'true';
+      const target = root.dataset.target || '';
+      const list = root.querySelector<HTMLElement>('[data-comment-list]')!;
+      const count = root.querySelector<HTMLElement>('[data-comment-count]')!;
+      const session = root.querySelector<HTMLElement>('[data-session]')!;
+      const form = root.querySelector<HTMLFormElement>('[data-comment-form]')!;
+      const status = root.querySelector<HTMLElement>('[data-comment-status]')!;
+
+      const renderComments = (items: CommentItem[]) => {
+        count.textContent = `${items.length} 条`;
+        list.replaceChildren();
+        if (!items.length) {
+          const empty = document.createElement('p'); empty.className = 'comments__empty'; empty.textContent = '还没有评论，来写下第一条吧。'; list.append(empty); return;
+        }
+        items.forEach((item) => {
+          const article = document.createElement('article'); article.className = 'comment';
+          const avatar = document.createElement('img'); avatar.className = 'comment__avatar'; avatar.src = item.avatar_url || '/images/avatar.svg'; avatar.alt = ''; avatar.loading = 'lazy';
+          const content = document.createElement('div'); content.className = 'comment__content';
+          const meta = document.createElement('div'); meta.className = 'comment__meta';
+          const author = document.createElement(item.author_url ? 'a' : 'span'); author.className = 'comment__author'; author.textContent = item.author;
+          if (author instanceof HTMLAnchorElement) { author.href = item.author_url!; author.target = '_blank'; author.rel = 'noopener noreferrer'; }
+          const time = document.createElement('time'); time.dateTime = item.created_at; time.textContent = new Date(`${item.created_at.replace(' ', 'T')}Z`).toLocaleString('zh-CN', { dateStyle: 'medium', timeStyle: 'short' });
+          const body = document.createElement('p'); body.textContent = item.body;
+          meta.append(author, time); content.append(meta, body); article.append(avatar, content); list.append(article);
+        });
+      };
+
+      const loadComments = async () => {
+        try { const response = await fetch(`/api/comments?kind=blog&target=${encodeURIComponent(target)}`); const data = await response.json(); if (!response.ok) throw new Error(data.error); renderComments(data.items || []); }
+        catch { list.innerHTML = '<p class="comments__empty">评论暂时无法加载。</p>'; count.textContent = '—'; }
+      };
+
+      Promise.all([fetch('/api/auth/me').then(response => response.json()), loadComments()]).then(([auth]) => {
+        session.replaceChildren();
+        if (auth.user) {
+          const identity = document.createElement('span'); identity.className = 'comments__identity';
+          const avatar = document.createElement('img'); avatar.src = auth.user.avatarUrl; avatar.alt = ''; const text = document.createElement('span'); text.textContent = `以 @${auth.user.login} 评论`;
+          const logout = document.createElement('a'); logout.href = `/api/auth/logout?returnTo=${encodeURIComponent(location.pathname)}`; logout.textContent = '退出';
+          identity.append(avatar, text); session.append(identity, logout); form.hidden = false;
+        } else {
+          const message = document.createElement('span'); message.textContent = '登录后即可参与讨论';
+          const login = document.createElement('a'); login.className = 'comments__login'; login.href = `/api/auth/github?returnTo=${encodeURIComponent(location.pathname)}`; login.textContent = '使用 GitHub 登录';
+          session.append(message, login);
+        }
+      }).catch(() => { session.textContent = '登录服务暂时不可用。'; });
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault(); const textarea = form.elements.namedItem('body') as HTMLTextAreaElement; const button = form.querySelector<HTMLButtonElement>('button')!;
+        button.disabled = true; status.textContent = '发布中…';
+        try {
+          const response = await fetch('/api/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: 'blog', target, body: textarea.value }) });
+          const data = await response.json(); if (!response.ok) throw new Error(data.error || '发布失败'); textarea.value = ''; status.textContent = '已发布'; await loadComments();
+        } catch (error) { status.textContent = error instanceof Error ? error.message : '发布失败，请稍后重试'; }
+        finally { button.disabled = false; }
+      });
+    });
+  }
+
+  document.addEventListener('astro:page-load', initializeComments);
+  initializeComments();
+</script>
+
+<style>
+  .comments { margin-top: 64px; padding-top: 32px; border-top: var(--line-width) solid var(--color-silver-light); }
+  .comments__header { display: flex; align-items: end; justify-content: space-between; margin-bottom: 24px; }
+  .comments__eyebrow { display: block; margin-bottom: 5px; font: 0.6rem/1 var(--font-mono); letter-spacing: .18em; color: var(--color-blue); }
+  .comments h2 { margin: 0; font: var(--text-h2); color: var(--color-deep-blue); }
+  .comments__count { font: .68rem/1 var(--font-mono); color: var(--color-silver); }
+  .comments__session { min-height: 48px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--color-silver-light); font: .72rem/1.4 var(--font-mono); color: var(--color-silver); }
+  .comments__session a { color: var(--color-blue); }
+  .comments__login { padding: 7px 10px; border: 1px solid var(--color-blue); text-decoration: none; }
+  .comments__identity { display: flex; align-items: center; gap: 8px; color: var(--color-deep-blue); }
+  .comments__identity img { width: 26px; height: 26px; border-radius: 50%; }
+  .comments__form { margin-top: 16px; }
+  .comments__form label { display: block; margin-bottom: 8px; font: .68rem/1 var(--font-mono); color: var(--color-silver); }
+  .comments__form textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid var(--color-silver-light); border-radius: 0; background: transparent; color: var(--color-black); font: .9rem/1.65 var(--font-body); }
+  .comments__form textarea:focus { border-color: var(--color-blue); outline: none; }
+  .comments__form-footer { display: flex; align-items: center; justify-content: space-between; min-height: 42px; }
+  .comments__form-footer span { font: .68rem/1 var(--font-mono); color: var(--color-silver); }
+  .comments__form button { padding: 8px 16px; border: 1px solid var(--color-deep-blue); background: var(--color-deep-blue); color: white; font: .68rem/1 var(--font-mono); cursor: pointer; }
+  .comments__form button:disabled { opacity: .5; cursor: wait; }
+  .comments__list { margin-top: 24px; }
+  .comments__empty { margin: 0; padding: 24px 0; font: .78rem/1.6 var(--font-mono); color: var(--color-silver); }
+  :global(.comment) { display: flex; gap: 12px; padding: 20px 0; border-top: 1px solid var(--color-silver-light); }
+  :global(.comment__avatar) { width: 34px; height: 34px; flex: 0 0 auto; border-radius: 50%; }
+  :global(.comment__content) { min-width: 0; flex: 1; }
+  :global(.comment__meta) { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 7px; font: .68rem/1.4 var(--font-mono); }
+  :global(.comment__author) { color: var(--color-deep-blue); font-weight: 600; }
+  :global(.comment__meta time) { color: var(--color-silver); white-space: nowrap; }
+  :global(.comment__content p) { margin: 0; color: var(--color-black); font: .9rem/1.7 var(--font-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+  @media (max-width: 520px) { .comments__session { align-items: flex-start; flex-direction: column; } :global(.comment__meta) { align-items: flex-start; flex-direction: column; gap: 2px; } }
+</style>

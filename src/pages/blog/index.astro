@@ -1,9 +1,4 @@
 ---
-// ============================================
-// HELICASE — Blog Index (/blog)
-// Lists all posts grouped by category.
-// Shows summary + reading time per post.
-// ============================================
 import { getCollection } from 'astro:content';
 import siteConfig from '../../data/site-config.json';
 import BaseLayout from '../../layouts/BaseLayout.astro';
@@ -15,314 +10,169 @@ function calcReadingTime(body: string): number {
   return Math.max(1, Math.ceil((cjk / 300) + (en / 200)));
 }
 
-const catEntries = await Promise.all(
-  siteConfig.categories.map(async (cat) => {
-    const posts = (await getCollection('blog', ({ data }) =>
-      data.category === cat.key && !data.draft
-    )).sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
-    return { ...cat, posts };
-  })
-);
-
-const totalPosts = catEntries.reduce((sum, c) => sum + c.posts.length, 0);
+const categories = await Promise.all(siteConfig.categories.map(async category => ({
+  ...category,
+  posts: (await getCollection('blog', ({ data }) => data.category === category.key && !data.draft))
+    .sort((a, b) => b.data.date.getTime() - a.data.date.getTime()),
+})));
+const totalPosts = categories.reduce((total, category) => total + category.posts.length, 0);
+const toSlug = (id: string) => id.replace(/\//g, '-');
 ---
 
-<BaseLayout title="Blog" description="文章归档">
-  <div class="blog-page">
-    <a href="/" class="blog-back">← canvas</a>
-
-    <header class="blog-header">
-      <h1 class="blog-title">WRITINGS</h1>
-      <span class="blog-count">{totalPosts} posts</span>
-      <a href="/editor" class="blog-editor author-only">editor ↗</a>
+<BaseLayout title="Writings" description="技术笔记、每日沉淀与评论文章">
+  <main class="writing-page" data-ark-theme="exa" data-ark-depth="moderate" data-ark-mode="writing-index">
+    <header class="writing-header">
+      <span>PUBLIC NOTES / {String(totalPosts).padStart(2, '0')}</span>
+      <h1>WRITINGS</h1>
     </header>
 
-    <section class="blog-discovery" aria-label="Search and filter writings">
-      <label class="blog-search-wrap">
+    <section class="writing-discovery" aria-label="Search and filter writings">
+      <label>
         <span>SEARCH</span>
-        <input id="blog-search" type="search" placeholder="title, summary, tag, or text…" autocomplete="off" />
+        <input id="blog-search" type="search" placeholder="标题、摘要、标签或正文…" autocomplete="off" />
       </label>
-      <div class="blog-filters" id="blog-filters" aria-label="Filter by category">
-        <button type="button" class="active" data-category="all" aria-pressed="true">ALL</button>
-        {catEntries.map(cat => <button type="button" data-category={cat.key} aria-pressed="false">{cat.label}</button>)}
+      <div class="writing-filters" id="blog-filters" aria-label="Filter by category">
+        <button type="button" class="active" data-category="all" aria-pressed="true">ALL <small>{totalPosts}</small></button>
+        {categories.map(category => (
+          <button type="button" data-category={category.key} aria-pressed="false">{category.label} <small>{category.posts.length}</small></button>
+        ))}
       </div>
-      <p class="blog-results" id="blog-results" aria-live="polite">{totalPosts} writings</p>
+      <p id="blog-results" aria-live="polite">{totalPosts} writings</p>
     </section>
 
-    {catEntries.map(cat => (
-      <section class="blog-cat" data-blog-section={cat.key}>
-        <h2 class="blog-cat-title">
-          <span class="blog-cat-label">{cat.label}</span>
-          <span class="blog-cat-count">{cat.posts.length}</span>
-        </h2>
-        <ul class="blog-cat-list">
-          {cat.posts.length > 0 ? cat.posts.map(post => {
-            const mins = calcReadingTime(post.body ?? '');
-            const slug = post.id.replace(/\//g, '-');
-            return (
+    <div class="category-grid" id="writing-categories">
+      {categories.map((category, categoryIndex) => (
+        <section class="writing-category" data-blog-section={category.key} aria-labelledby={`category-${category.key}`}>
+          <header>
+            <span>{String(categoryIndex + 1).padStart(2, '0')}</span>
+            <h2 id={`category-${category.key}`}>{category.label}</h2>
+            <em>{category.posts.length}</em>
+          </header>
+          <ol>
+            {category.posts.map(post => (
               <li
                 class="blog-post-item"
-                data-category={cat.key}
+                data-category={category.key}
                 data-search={`${post.data.title} ${post.data.summary} ${post.data.tags.join(' ')} ${post.body}`.toLocaleLowerCase('zh-CN')}
               >
-                <a href={`/blog/${slug}`} class="blog-post-link">
-                  <span class="blog-post-main">
-                    <span class="blog-post-title">{post.data.title}</span>
-                    {post.data.summary && (
-                      <span class="blog-post-summary">{post.data.summary}</span>
-                    )}
-                  </span>
-                  <span class="blog-post-side">
-                    <span class="blog-post-mins">{mins} min</span>
-                    <time class="blog-post-date">
-                      {post.data.date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-                    </time>
-                  </span>
+                <a href={`/blog/${toSlug(post.id)}`}>
+                  <time>{post.data.date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })}</time>
+                  <strong>{post.data.title}</strong>
+                  <p>{post.data.summary}</p>
+                  <span>{calcReadingTime(post.body ?? '')} min</span>
                 </a>
               </li>
-            );
-          }) : <li class="blog-empty">no posts yet</li>}
-        </ul>
-      </section>
-    ))}
-  </div>
+            ))}
+          </ol>
+        </section>
+      ))}
+    </div>
+    <p class="writing-empty" id="blog-empty" hidden>没有匹配的公开文章。</p>
+  </main>
 
   <script>
-    const searchInput = document.getElementById('blog-search') as HTMLInputElement | null;
-    const filterGroup = document.getElementById('blog-filters');
-    const resultText = document.getElementById('blog-results');
-    const postItems = Array.from(document.querySelectorAll<HTMLElement>('.blog-post-item'));
-    const categorySections = Array.from(document.querySelectorAll<HTMLElement>('[data-blog-section]'));
-    let activeCategory = 'all';
+    function setupWritingDiscovery() {
+      const searchInput = document.getElementById('blog-search') as HTMLInputElement | null;
+      const filterGroup = document.getElementById('blog-filters');
+      const resultText = document.getElementById('blog-results');
+      const emptyText = document.getElementById('blog-empty');
+      const postItems = Array.from(document.querySelectorAll<HTMLElement>('.blog-post-item'));
+      const categorySections = Array.from(document.querySelectorAll<HTMLElement>('[data-blog-section]'));
+      if (!searchInput || !filterGroup || filterGroup.dataset.ready === 'true') return;
+      filterGroup.dataset.ready = 'true';
+      let activeCategory = 'all';
 
-    function applyDiscovery() {
-      const query = searchInput?.value.trim().toLocaleLowerCase('zh-CN') ?? '';
-      let visibleCount = 0;
-
-      for (const item of postItems) {
-        const categoryMatch = activeCategory === 'all' || item.dataset.category === activeCategory;
-        const textMatch = !query || (item.dataset.search ?? '').includes(query);
-        const visible = categoryMatch && textMatch;
-        item.hidden = !visible;
-        if (visible) visibleCount += 1;
+      function applyDiscovery() {
+        const query = searchInput?.value.trim().toLocaleLowerCase('zh-CN') ?? '';
+        let visibleCount = 0;
+        for (const item of postItems) {
+          const categoryMatch = activeCategory === 'all' || item.dataset.category === activeCategory;
+          const textMatch = !query || (item.dataset.search ?? '').includes(query);
+          item.hidden = !(categoryMatch && textMatch);
+          if (!item.hidden) visibleCount += 1;
+        }
+        for (const section of categorySections) {
+          section.hidden = !Array.from(section.querySelectorAll<HTMLElement>('.blog-post-item')).some(item => !item.hidden);
+        }
+        if (resultText) resultText.textContent = `${visibleCount} ${visibleCount === 1 ? 'writing' : 'writings'}`;
+        if (emptyText) emptyText.hidden = visibleCount !== 0;
       }
 
-      for (const section of categorySections) {
-        const hasVisiblePost = Array.from(section.querySelectorAll<HTMLElement>('.blog-post-item')).some(item => !item.hidden);
-        section.hidden = !hasVisiblePost;
-      }
-
-      if (resultText) resultText.textContent = `${visibleCount} ${visibleCount === 1 ? 'writing' : 'writings'}`;
+      searchInput.addEventListener('input', applyDiscovery);
+      filterGroup.addEventListener('click', event => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-category]');
+        if (!button) return;
+        activeCategory = button.dataset.category ?? 'all';
+        for (const candidate of filterGroup.querySelectorAll<HTMLButtonElement>('button[data-category]')) {
+          const active = candidate === button;
+          candidate.classList.toggle('active', active);
+          candidate.setAttribute('aria-pressed', String(active));
+        }
+        applyDiscovery();
+      });
     }
-
-    searchInput?.addEventListener('input', applyDiscovery);
-    filterGroup?.addEventListener('click', event => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-category]');
-      if (!button) return;
-      activeCategory = button.dataset.category ?? 'all';
-      for (const candidate of filterGroup.querySelectorAll<HTMLButtonElement>('button[data-category]')) {
-        const active = candidate === button;
-        candidate.classList.toggle('active', active);
-        candidate.setAttribute('aria-pressed', String(active));
-      }
-      applyDiscovery();
-    });
+    document.addEventListener('astro:page-load', setupWritingDiscovery);
+    setupWritingDiscovery();
   </script>
 </BaseLayout>
 
 <style is:global>
-  .blog-page {
-    max-width: 860px;
-    margin: 0 auto;
-    padding: 48px 24px 80px;
+  .writing-page { width: min(1180px, 100%); height: calc(100svh - 36px); margin: 0 auto; padding: 22px 32px 24px; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; }
+  .writing-header { display: flex; align-items: baseline; justify-content: space-between; gap: 24px; padding: 8px 0 15px; border-bottom: 1px solid var(--color-deep-blue); }
+  .writing-header span,
+  .writing-discovery,
+  .writing-category header,
+  .writing-category time,
+  .writing-category li > a > span { font-family: var(--font-mono); }
+  .writing-header span { font-size: .62rem; letter-spacing: .16em; color: var(--color-blue); }
+  .writing-header h1 { order: -1; font: 700 clamp(1.7rem, 3.4vw, 2.65rem)/.9 var(--font-mono); letter-spacing: -.045em; color: var(--color-deep-blue); }
+
+  .writing-discovery { display: grid; grid-template-columns: minmax(300px, 1fr) auto; gap: 9px 36px; align-items: end; margin-top: 16px; padding: 10px 0; border-top: 1px solid var(--color-silver-light); border-bottom: 1px solid var(--color-silver-light); }
+  .writing-discovery label { display: flex; align-items: baseline; gap: 16px; }
+  .writing-discovery label > span,
+  .writing-discovery > p { font-size: .62rem; letter-spacing: .13em; color: var(--color-silver); }
+  .writing-discovery input { flex: 1; min-width: 0; padding: 7px 0; border: 0; border-bottom: 1px solid var(--color-silver-light); outline: 0; background: transparent; font: .72rem var(--font-body); color: var(--color-black); }
+  .writing-discovery input:focus { border-bottom-color: var(--color-blue); }
+  .writing-filters { display: flex; gap: 14px; }
+  .writing-filters button { padding: 6px 0; border: 0; border-bottom: 1px solid transparent; background: none; font: 550 .62rem var(--font-mono); letter-spacing: .09em; color: var(--color-silver); cursor: pointer; }
+  .writing-filters button small { margin-left: 2px; color: var(--color-silver-light); }
+  .writing-filters button:hover,
+  .writing-filters button.active { border-bottom-color: var(--color-blue); color: var(--color-blue); }
+  .writing-discovery > p { grid-column: 1 / -1; margin: 0; }
+
+  .category-grid { min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 38px; margin-top: 24px; }
+  .writing-category { min-width: 0; }
+  .writing-category > header { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding-bottom: 11px; border-bottom: 1px solid var(--color-deep-blue); }
+  .writing-category header span,
+  .writing-category header em { font-size: .6rem; color: var(--color-blue); font-style: normal; }
+  .writing-category header em { color: var(--color-silver); }
+  .writing-category h2 { font: 650 .82rem/1 var(--font-mono); letter-spacing: .15em; color: var(--color-deep-blue); }
+  .writing-category ol { list-style: none; margin: 0; padding: 0; }
+  .writing-category li { border-bottom: 1px solid var(--color-silver-light); }
+  .writing-category li > a { position: relative; display: block; min-height: 104px; padding: 12px 0 22px; }
+  .writing-category time { font-size: .62rem; color: var(--color-blue); }
+  .writing-category strong { display: block; margin-top: 8px; font: 600 .8rem/1.35 var(--font-body); }
+  .writing-category p { margin-top: 5px; font-size: .72rem; line-height: 1.45; color: var(--color-text-secondary); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .writing-category li > a > span { position: absolute; right: 0; bottom: 7px; font-size: .6rem; color: var(--color-silver-light); }
+  .writing-category a:hover strong { color: var(--color-blue); }
+  .blog-post-item[hidden],
+  .writing-category[hidden] { display: none !important; }
+  .writing-empty { margin-top: 64px; padding: 30px 0; border-top: 1px solid var(--color-silver-light); font: .7rem var(--font-mono); color: var(--color-silver); }
+
+  @media (max-width: 760px) {
+    .writing-page { height: auto; min-height: calc(100svh - 36px); padding: 24px 16px 64px; display: block; overflow: visible; }
+    .writing-header { align-items: center; }
+    .writing-discovery { grid-template-columns: 1fr; align-items: stretch; margin-top: 24px; }
+    .writing-filters { overflow-x: auto; padding-bottom: 3px; }
+    .category-grid { grid-template-columns: 1fr; gap: 42px; margin-top: 38px; }
+    .writing-category li > a { min-height: 116px; }
+    .writing-category p { -webkit-line-clamp: 2; }
   }
 
-  .blog-back {
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: var(--color-silver);
-    letter-spacing: 0.08em;
-    transition: color var(--duration-micro);
-    margin-bottom: 24px;
-    display: inline-block;
-  }
-  .blog-back:hover { color: var(--color-blue); }
-
-  .blog-header {
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-    margin-bottom: 28px;
-  }
-
-  .blog-discovery {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px 24px;
-    align-items: end;
-    margin-bottom: 40px;
-    padding: 16px 0;
-    border-top: 1px solid var(--color-silver-light);
-    border-bottom: 1px solid var(--color-silver-light);
-  }
-
-  .blog-search-wrap { display: flex; align-items: baseline; gap: 14px; }
-  .blog-search-wrap span,
-  .blog-results { font: 500 0.58rem/1 var(--font-mono); color: var(--color-silver); letter-spacing: 0.12em; }
-  .blog-search-wrap input {
-    flex: 1;
-    min-width: 0;
-    padding: 5px 0;
-    border: 0;
-    border-bottom: 1px solid transparent;
-    outline: none;
-    background: transparent;
-    color: var(--color-black);
-    font: 400 0.78rem/1.4 var(--font-mono);
-  }
-  .blog-search-wrap input:focus { border-bottom-color: var(--color-blue); }
-  .blog-search-wrap input::placeholder { color: var(--color-silver-light); }
-  .blog-filters { display: flex; gap: 12px; }
-  .blog-filters button {
-    border: 0;
-    border-bottom: 1px solid transparent;
-    padding: 4px 0;
-    background: none;
-    color: var(--color-silver);
-    font: 500 0.58rem/1 var(--font-mono);
-    letter-spacing: 0.1em;
-    cursor: pointer;
-  }
-  .blog-filters button:hover,
-  .blog-filters button.active { color: var(--color-blue); border-bottom-color: var(--color-blue); }
-  .blog-results { grid-column: 1 / -1; margin: 0; color: var(--color-silver-light); }
-
-  .blog-title {
-    font: 700 0.75rem/1 var(--font-mono);
-    color: var(--color-deep-blue);
-    letter-spacing: 0.2em;
-  }
-
-  .blog-count {
-    font: 400 0.7rem/1 var(--font-mono);
-    color: var(--color-silver);
-  }
-
-  .blog-editor {
-    margin-left: auto;
-    font: 400 0.65rem/1 var(--font-mono);
-    color: var(--color-silver);
-    letter-spacing: 0.08em;
-  }
-  .blog-editor:hover { color: var(--color-blue); }
-
-  .blog-cat {
-    margin-bottom: 44px;
-  }
-
-  .blog-cat-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--color-silver-light);
-  }
-
-  .blog-cat-label {
-    font: 600 0.65rem/1 var(--font-mono);
-    color: var(--color-blue);
-    letter-spacing: 0.15em;
-  }
-
-  .blog-cat-count {
-    font: 400 0.6rem/1 var(--font-mono);
-    color: var(--color-silver);
-  }
-
-  .blog-cat-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    list-style: none;
-  }
-
-  .blog-post-link {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 20px;
-    font-family: var(--font-mono);
-    color: var(--color-black);
-    transition: color var(--duration-micro);
-    padding: 10px 0;
-    border-bottom: 1px solid transparent;
-  }
-  .blog-post-link:hover {
-    color: var(--color-blue);
-  }
-  .blog-post-link:hover .blog-post-title {
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 3px;
-  }
-
-  .blog-post-main {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    flex: 1;
-  }
-
-  .blog-post-title {
-    font-size: 0.85rem;
-    line-height: 1.4;
-    font-weight: 500;
-  }
-
-  .blog-post-summary {
-    font-size: 0.72rem;
-    line-height: 1.5;
-    color: var(--color-text-secondary);
-    font-family: var(--font-body);
-    display: -webkit-box;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .blog-post-side {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-    flex-shrink: 0;
-  }
-
-  .blog-post-mins {
-    font-size: 0.6rem;
-    color: var(--color-silver-light);
-  }
-
-  .blog-post-date {
-    font-size: 0.65rem;
-    color: var(--color-silver);
-    white-space: nowrap;
-  }
-
-  .blog-empty {
-    font-size: 0.7rem;
-    color: var(--color-silver-light);
-    font-family: var(--font-mono);
-    padding: 8px 0;
-  }
-
-  @media (max-width: 767px) {
-    .blog-page { padding: 40px 16px 80px; }
-    .blog-discovery { grid-template-columns: 1fr; align-items: stretch; }
-    .blog-filters { overflow-x: auto; padding-bottom: 2px; }
-    .blog-post-summary { display: none; }
-    .blog-post-link { gap: 12px; }
+  @media (max-height: 660px) and (min-width: 761px) {
+    .writing-page { padding-top: 16px; padding-bottom: 16px; }
+    .writing-discovery { margin-top: 10px; padding-block: 7px; }
+    .category-grid { margin-top: 16px; }
+    .writing-category li > a { min-height: 88px; padding-top: 9px; }
   }
 </style>
