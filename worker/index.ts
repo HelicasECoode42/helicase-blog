@@ -310,6 +310,36 @@ async function adminComments(request: Request, env: AuthEnv): Promise<Response> 
   const db = database(env); if (!db) return json(503, { error: 'Comment storage is not configured' }); if (request.method === 'GET') { const rows = await db.prepare("SELECT id, target_id, author, body, status, created_at FROM comments WHERE status = 'pending' ORDER BY created_at ASC LIMIT 100").all(); return json(200, { items: rows.results }); }
   if (request.method !== 'POST') return json(405, { error: 'Method not allowed' }); const parsed = await limitedJson<Record<string, unknown>>(request, 4 * 1024); if ('response' in parsed) return parsed.response; const body = parsed.value && typeof parsed.value === 'object' ? parsed.value : {}; const id = safeText(body.id, 64), status = body.status === 'approved' ? 'approved' : body.status === 'rejected' ? 'rejected' : ''; if (!idPattern.test(id) || !status) return json(400, { error: 'Invalid moderation action' }); await db.prepare('UPDATE comments SET status = ? WHERE id = ?').bind(status, id).run(); return json(200, { ok: true });
 }
+async function publicLinkApplications(request: Request, env: AuthEnv): Promise<Response> {
+  if (request.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  const db = database(env); if (!db) return json(503, { error: 'Link application storage is not configured' });
+  const parsed = await limitedJson<Record<string, unknown>>(request, 12 * 1024); if ('response' in parsed) return parsed.response;
+  const body = parsed.value && typeof parsed.value === 'object' ? parsed.value : {};
+  if (safeText(body.website, 200)) return json(202, { ok: true, status: 'pending' });
+  const name = safeText(body.name, 80), description = safeText(body.description, 240), contact = safeText(body.contact, 160);
+  const siteUrl = validUrl(body.url), avatarUrl = body.avatarUrl ? validUrl(body.avatarUrl) : null, backlinkUrl = body.backlinkUrl ? validUrl(body.backlinkUrl) : null;
+  if (!name || !description || !contact || !siteUrl || (body.avatarUrl && !avatarUrl) || (body.backlinkUrl && !backlinkUrl)) return json(400, { error: 'Please check the required fields and URLs' });
+  if (new URL(siteUrl).protocol !== 'https:' || (avatarUrl && new URL(avatarUrl).protocol !== 'https:') || (backlinkUrl && new URL(backlinkUrl).protocol !== 'https:')) return json(400, { error: 'Website URLs must use HTTPS' });
+  if (!await takeRateLimit(request, env, 'link-application', 3, 86400)) return json(429, { error: 'Too many applications; please try again tomorrow' });
+  if (!await verifyTurnstile(request, env, body.turnstileToken)) return json(403, { error: 'Verification failed' });
+  await db.prepare('INSERT INTO link_applications (id, name, url, description, contact, avatar_url, backlink_url) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(newId(), name, siteUrl, description, contact, avatarUrl, backlinkUrl).run();
+  return json(202, { ok: true, status: 'pending' });
+}
+async function adminLinkApplications(request: Request, env: AuthEnv): Promise<Response> {
+  const db = database(env); if (!db) return json(503, { error: 'Link application storage is not configured' });
+  if (request.method === 'GET') {
+    const rows = await db.prepare("SELECT id, name, url, description, contact, avatar_url, backlink_url, status, created_at FROM link_applications WHERE status = 'pending' ORDER BY created_at ASC LIMIT 100").all();
+    return json(200, { items: rows.results });
+  }
+  if (request.method !== 'POST') return json(405, { error: 'Method not allowed' });
+  const parsed = await limitedJson<Record<string, unknown>>(request, 4 * 1024); if ('response' in parsed) return parsed.response;
+  const body = parsed.value && typeof parsed.value === 'object' ? parsed.value : {};
+  const id = safeText(body.id, 64), status = body.status === 'approved' ? 'approved' : body.status === 'rejected' ? 'rejected' : '';
+  if (!idPattern.test(id) || !status) return json(400, { error: 'Invalid review action' });
+  await db.prepare("UPDATE link_applications SET status = ?, reviewed_at = datetime('now') WHERE id = ?").bind(status, id).run();
+  return json(200, { ok: true });
+}
 function validateSiteSetting(name: SiteSettingName, input: unknown): unknown | null {
   const object = input && typeof input === 'object' ? input as Record<string, unknown> : null;
   if (name === 'profile') {
@@ -329,8 +359,8 @@ function validateSiteSetting(name: SiteSettingName, input: unknown): unknown | n
     if (!Array.isArray(input) || input.length > 100) return null;
     const links = input.map(item => {
       const link = item && typeof item === 'object' ? item as Record<string, unknown> : null;
-      const linkName = safeText(link?.name, 80), note = safeText(link?.note, 240), url = validSiteUrl(link?.url);
-      return linkName && url ? { name: linkName, note, url } : null;
+      const linkName = safeText(link?.name, 80), note = safeText(link?.note, 240), url = validSiteUrl(link?.url), avatar = link?.avatar ? validSiteUrl(link.avatar, true) : null;
+      return linkName && url && (!link?.avatar || avatar) ? { name: linkName, note, url, ...(avatar ? { avatar } : {}) } : null;
     });
     return links.some(item => !item) ? null : links;
   }
@@ -485,7 +515,7 @@ async function adminSite(request: Request, env: AuthEnv, name: SiteSettingName):
 export default { async fetch(request: Request, env: AuthEnv): Promise<Response> {
   const pathname = new URL(request.url).pathname;
   if (pathname.startsWith('/api/auth/')) return authApi(request, env, pathname);
-  if (pathname === '/api/oc-config') return json(200, { sitekey: env.PUBLIC_TURNSTILE_SITE_KEY || '' });
+  if (pathname === '/api/oc-config' || pathname === '/api/link-application-config') return json(200, { sitekey: env.PUBLIC_TURNSTILE_SITE_KEY || '' });
   const protectedRequest = isProtectedPath(pathname) || pathname === '/api/publish' || pathname.startsWith('/api/admin/');
   if (protectedRequest && !authorized(request, env)) {
     if (!await authFailureAllowed(request, env)) return json(429, { error: 'Too many failed authentication attempts' });
@@ -501,8 +531,10 @@ export default { async fetch(request: Request, env: AuthEnv): Promise<Response> 
   if (pathname === '/api/publish') return publishArticle(request, env);
   const contentMatch = pathname.match(/^\/api\/content\/(favorites|mood|zine)$/); if (contentMatch) return publicContent(request, env, contentMatch[1] as ContentKind);
   if (pathname === '/api/comments') { const guard = writeGuard(request, false); if (guard) return guard; return publicComments(request, env); }
+  if (pathname === '/api/link-applications') { const guard = writeGuard(request, false); if (guard) return guard; return publicLinkApplications(request, env); }
   const adminMatch = pathname.match(/^\/api\/admin\/content\/(favorites|mood|zine)(?:\/([A-Za-z0-9_-]{8,64}))?$/); if (adminMatch) return adminContent(request, env, adminMatch[1] as ContentKind, adminMatch[2]);
   if (pathname === '/api/admin/comments') return adminComments(request, env);
+  if (pathname === '/api/admin/link-applications') return adminLinkApplications(request, env);
   if (pathname === '/api/admin/articles') return adminArticles(request, env);
   const sitePublishMatch = pathname.match(/^\/api\/admin\/site\/(profile|links|projects)\/publish$/); if (sitePublishMatch) return publishSiteSetting(request, env, sitePublishMatch[1] as SiteSettingName);
   const siteMatch = pathname.match(/^\/api\/admin\/site\/(profile|links|projects)$/); if (siteMatch) return adminSite(request, env, siteMatch[1] as SiteSettingName);

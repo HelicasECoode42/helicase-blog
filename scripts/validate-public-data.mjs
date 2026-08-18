@@ -22,7 +22,7 @@ if (!Array.isArray(profile.socials) || profile.socials.length > 12 || profile.so
 }
 
 const links = await readJson('../src/data/links.json');
-if (!Array.isArray(links) || links.length > 100 || links.some(item => !isText(item?.name, 80) || !isText(item?.note, 240, false) || !isUrl(item?.url))) {
+if (!Array.isArray(links) || links.length > 100 || links.some(item => !isText(item?.name, 80) || !isText(item?.note, 240, false) || !isUrl(item?.url) || (item?.avatar && !isUrl(item.avatar, true)))) {
   errors.push('links.json: expected an array of valid public links');
 }
 

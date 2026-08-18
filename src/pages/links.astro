@@ -1,27 +1,94 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import rawLinks from '../data/links.json';
-type PublicLink = { name: string; note: string; url: string };
+type PublicLink = { name: string; note: string; url: string; avatar?: string };
 const links = rawLinks as PublicLink[];
 ---
 
-<BaseLayout title="Links" description="友链">
+<BaseLayout title="Links" description="HELICASE 的朋友们与友情链接申请">
   <main class="links-page" data-ark-theme="exa" data-ark-depth="minimal" data-ark-mode="editorial">
-    <a href="/">← canvas</a>
-    <h1>LINKS</h1>
-    <div class="links-list">
-      {links.map(link => (
-        <a href={link.url} target="_blank" rel="noopener noreferrer">
-          <strong>{link.name}</strong>
-          <span>{link.note}</span>
-          <em>↗</em>
-        </a>
-      ))}
-      {links.length === 0 && <p>—</p>}
-    </div>
+    <a class="back-link" href="/">← canvas</a>
+    <header class="page-header">
+      <div><span class="eyebrow">CONNECTION ARCHIVE / 01</span><h1>LINKS</h1></div>
+    </header>
+
+    <section class="links-section" aria-labelledby="friends-title">
+      <div class="section-heading"><span>FRIENDS</span><h2 id="friends-title">朋友们</h2><small>{String(links.length).padStart(2, '0')}</small></div>
+      <div class="links-list">
+        {links.map(link => (
+          <a href={link.url} target="_blank" rel="noopener noreferrer">
+            <img src={link.avatar || '/images/avatar.svg'} alt="" width="36" height="36" loading="lazy" />
+            <strong>{link.name}</strong><span>{link.note}</span><em aria-hidden="true">↗</em>
+          </a>
+        ))}
+        {links.length === 0 && <p class="empty">第一条连接还在路上。</p>}
+      </div>
+    </section>
+
+    <section class="application" aria-labelledby="application-title">
+      <div class="application-intro">
+        <span class="eyebrow">OPEN CHANNEL / 02</span>
+        <h2 id="application-title">申请友链</h2>
+        <p>如果你也在认真维护自己的小站，欢迎来交换链接。内容真实、可正常访问即可；提交后我会手动查看。</p>
+        <dl class="my-link" aria-label="本站友链信息">
+          <div><dt>名称</dt><dd>HELICASE</dd></div>
+          <div><dt>地址</dt><dd><a href="https://helicase.xin">https://helicase.xin</a></dd></div>
+          <div><dt>简介</dt><dd>活人干吧。</dd></div>
+          <div><dt>头像</dt><dd><a href="https://helicase.xin/images/avatar.jpg">avatar.jpg</a></dd></div>
+        </dl>
+      </div>
+
+      <form class="application-form" id="link-application-form">
+        <div class="field"><label for="link-name">网站名称 <span>required</span></label><input id="link-name" name="name" type="text" maxlength="80" autocomplete="organization" required /></div>
+        <div class="field"><label for="link-url">网站地址 <span>https only</span></label><input id="link-url" name="url" type="url" maxlength="500" inputmode="url" autocomplete="url" placeholder="https://" pattern="https://.*" required /></div>
+        <div class="field field-wide"><label for="link-description">一句话介绍 <span>240 chars</span></label><textarea id="link-description" name="description" maxlength="240" rows="3" required></textarea></div>
+        <div class="field"><label for="link-contact">联系方式 <span>仅站长可见</span></label><input id="link-contact" name="contact" type="text" maxlength="160" autocomplete="email" placeholder="邮箱 / 社交账号" required /></div>
+        <div class="field"><label for="link-avatar">头像地址 <span>optional</span></label><input id="link-avatar" name="avatarUrl" type="url" maxlength="500" inputmode="url" placeholder="https://" pattern="https://.*" /></div>
+        <div class="field field-wide"><label for="link-backlink">本站链接所在页面 <span>optional</span></label><input id="link-backlink" name="backlinkUrl" type="url" maxlength="500" inputmode="url" placeholder="https://your-site.example/links" pattern="https://.*" /></div>
+        <div class="trap" aria-hidden="true"><label for="link-website">Website</label><input id="link-website" name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+        <div class="verification field-wide"><div id="link-turnstile" hidden></div><span id="verification-status">正在准备安全验证…</span></div>
+        <div class="submit-row field-wide"><p id="application-status" role="status" aria-live="polite">资料仅用于友链审核。</p><button type="submit" disabled>提交申请 <span aria-hidden="true">→</span></button></div>
+      </form>
+    </section>
   </main>
 </BaseLayout>
 
+<script>
+  const form = document.getElementById('link-application-form') as HTMLFormElement | null;
+  const submit = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
+  const status = document.getElementById('application-status'), verificationStatus = document.getElementById('verification-status'), turnstileTarget = document.getElementById('link-turnstile');
+  let turnstileToken = '', widgetId: string | number | null = null;
+  function setVerification(message: string, ready = false) { if (verificationStatus) verificationStatus.textContent = message; if (submit) submit.disabled = !ready; }
+  function loadTurnstile(sitekey: string) {
+    if (!turnstileTarget) return; turnstileTarget.hidden = false;
+    const render = () => {
+      const api = (window as any).turnstile; if (!api) return setVerification('安全验证加载失败，请刷新后重试。');
+      widgetId = api.render(turnstileTarget, { sitekey, theme: 'light', size: 'flexible',
+        callback: (token: string) => { turnstileToken = token; setVerification('安全验证已完成。', true); },
+        'expired-callback': () => { turnstileToken = ''; setVerification('验证已过期，请重新完成验证。'); },
+        'error-callback': () => { turnstileToken = ''; setVerification('安全验证暂时不可用，请稍后再试。'); },
+      });
+    };
+    if ((window as any).turnstile) return render();
+    const script = document.createElement('script'); script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; script.async = true; script.defer = true;
+    script.addEventListener('load', render, { once: true }); script.addEventListener('error', () => setVerification('安全验证加载失败，请刷新后重试。'), { once: true }); document.head.append(script);
+  }
+  fetch('/api/link-application-config').then(response => response.ok ? response.json() : Promise.reject()).then(data => data.sitekey ? loadTurnstile(data.sitekey) : setVerification('申请功能正在配置中，请稍后再来。')).catch(() => setVerification('申请功能暂时不可用，请稍后再来。'));
+  form?.addEventListener('submit', async event => {
+    event.preventDefault(); if (!submit || !status || !form.reportValidity() || !turnstileToken) return; submit.disabled = true; status.textContent = '正在送出申请…';
+    const values = Object.fromEntries(new FormData(form).entries());
+    try {
+      const response = await fetch('/api/link-applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, turnstileToken }) });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error || '提交失败'); form.reset(); turnstileToken = ''; status.textContent = '申请已收到，感谢你发来这条连接。'; setVerification('申请已提交。');
+      const api = (window as any).turnstile; if (api && widgetId !== null) api.reset(widgetId);
+    } catch (error) {
+      status.textContent = error instanceof Error ? error.message : '提交失败，请稍后再试。'; const api = (window as any).turnstile; if (api && widgetId !== null) api.reset(widgetId); turnstileToken = ''; setVerification('请重新完成安全验证。');
+    }
+  });
+</script>
+
 <style>
-  .links-page{max-width:720px;margin:0 auto;padding:64px 24px 120px}.links-page>a{font:10px var(--font-mono);color:var(--color-silver)}h1{font:700 1rem var(--font-mono);letter-spacing:.2em;color:var(--color-deep-blue);margin:44px 0 26px}.links-list>a{display:grid;grid-template-columns:160px 1fr auto;gap:20px;align-items:baseline;padding:15px 0;border-top:1px solid var(--color-silver-light)}.links-list strong{font:600 .78rem var(--font-mono)}.links-list span{font:.85rem var(--font-body);color:var(--color-text-secondary)}.links-list em{font-style:normal;color:var(--color-blue)}.links-list p{font:1rem var(--font-mono);color:var(--color-silver)}@media(max-width:600px){.links-page{padding:48px 16px 100px}.links-list>a{grid-template-columns:1fr auto}.links-list span{grid-column:1/-1}}
+  .links-page{max-width:920px;margin:0 auto;padding:64px 24px 120px}.back-link{font:10px var(--font-mono);color:var(--color-silver)}.page-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,360px);gap:48px;align-items:end;margin:44px 0 56px;padding-bottom:24px;border-bottom:1px solid var(--color-silver-light)}.eyebrow,.section-heading span{font:600 .58rem/1 var(--font-mono);letter-spacing:.18em;color:var(--color-blue)}h1{font:700 1rem/1 var(--font-mono);letter-spacing:.2em;color:var(--color-deep-blue);margin:14px 0 0}.page-header p,.application-intro>p{margin:0;color:var(--color-text-secondary);font:.9rem/1.8 var(--font-body)}.links-section{display:grid;grid-template-columns:170px 1fr;gap:40px}.section-heading{position:relative}.section-heading h2,.application h2{margin:9px 0 0;font:700 1.15rem/1.25 var(--font-body);color:var(--color-deep-blue)}.section-heading small{display:block;margin-top:12px;font:.65rem var(--font-mono);color:var(--color-silver);font-variant-numeric:tabular-nums}.links-list>a{display:grid;grid-template-columns:160px 1fr auto;gap:20px;align-items:baseline;min-height:48px;padding:15px 0;border-top:1px solid var(--color-silver-light)}.links-list>a:last-child{border-bottom:1px solid var(--color-silver-light)}.links-list strong{font:600 .78rem var(--font-mono);color:var(--color-black)}.links-list span{font:.85rem var(--font-body);color:var(--color-text-secondary)}.links-list em{font-style:normal;color:var(--color-blue)}.links-list>a:hover strong{color:var(--color-blue)}.empty{margin:0;padding:24px 0;border-top:1px solid var(--color-silver-light);font:.8rem var(--font-mono);color:var(--color-silver)}.application{display:grid;grid-template-columns:minmax(240px,1fr) minmax(0,1.55fr);gap:64px;margin-top:96px;padding-top:36px;border-top:1px solid var(--color-deep-blue)}.application-intro>p{margin-top:20px}.my-link{margin:28px 0 0;border-top:1px solid var(--color-silver-light)}.my-link div{display:grid;grid-template-columns:56px 1fr;gap:10px;padding:9px 0;border-bottom:1px solid var(--color-silver-light);font:.68rem/1.5 var(--font-mono)}.my-link dt{color:var(--color-silver)}.my-link dd{margin:0;overflow-wrap:anywhere;color:var(--color-deep-blue)}.my-link a{color:var(--color-blue)}.application-form{display:grid;grid-template-columns:1fr 1fr;gap:24px 18px}.field{min-width:0}.field label{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px;font:600 .65rem/1.2 var(--font-mono);color:var(--color-deep-blue)}.field label span{font-weight:400;color:var(--color-silver)}.field input,.field textarea{display:block;width:100%;border:0;border-bottom:1px solid var(--color-silver-light);border-radius:0;background:transparent;padding:10px 0;color:var(--color-black);font:.86rem/1.55 var(--font-body);transition:border-color var(--duration-micro)}.field textarea{resize:vertical;min-height:78px}.field input:focus,.field textarea:focus{outline:0;border-color:var(--color-blue)}.field-wide{grid-column:1/-1}.trap{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip-path:inset(50%)}.verification{min-height:70px;padding-top:2px}.verification>span{display:block;font:.63rem/1.5 var(--font-mono);color:var(--color-silver)}#link-turnstile{margin-bottom:8px}.submit-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-top:18px;border-top:1px solid var(--color-silver-light)}.submit-row p{margin:0;font:.65rem/1.5 var(--font-mono);color:var(--color-silver)}.submit-row button{flex:0 0 auto;min-height:42px;border:1px solid var(--color-deep-blue);border-radius:0;background:var(--color-deep-blue);padding:11px 16px;color:white;font:600 .68rem/1 var(--font-mono);cursor:pointer;transition:background var(--duration-micro),color var(--duration-micro)}.submit-row button:hover:not(:disabled){background:transparent;color:var(--color-deep-blue)}.submit-row button:disabled{opacity:.38;cursor:not-allowed}@media(max-width:720px){.links-page{padding:48px 16px 100px}.page-header{grid-template-columns:1fr;gap:24px;margin-bottom:54px}.links-section{grid-template-columns:1fr;gap:18px}.section-heading{display:grid;grid-template-columns:1fr auto;align-items:end}.section-heading span{grid-column:1/-1}.section-heading small{margin:0}.application{grid-template-columns:1fr;gap:42px;margin-top:72px}.links-list>a{grid-template-columns:1fr auto}.links-list span{grid-column:1/-1}.application-form{grid-template-columns:1fr}.field-wide{grid-column:auto}.submit-row{align-items:flex-start;flex-direction:column}.submit-row button{width:100%}}@media(prefers-reduced-motion:reduce){.field input,.field textarea,.submit-row button{transition:none}}
+  .links-list>a{grid-template-columns:36px 140px 1fr auto;align-items:center}.links-list img{width:36px;height:36px;object-fit:cover;border:1px solid var(--color-silver-light);background:var(--color-white)}
+  @media(max-width:720px){.links-list>a{grid-template-columns:36px 1fr auto}.links-list span{grid-column:2/-1}}
 </style>

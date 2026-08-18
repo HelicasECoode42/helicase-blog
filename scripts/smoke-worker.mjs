@@ -89,6 +89,7 @@ async function startWorker(port, githubPort) {
     '--var', 'GITHUB_REPO:smoke',
     '--var', `GITHUB_API_BASE_URL:http://127.0.0.1:${githubPort}`,
     '--var', 'PUBLIC_TURNSTILE_SITE_KEY:smoke-site-key',
+    '--var', 'TURNSTILE_SECRET_KEY:1x0000000000000000000000000000000AA',
     '--var', 'ALLOW_INSECURE_TURNSTILE_BYPASS:true',
   ];
   const child = spawn(wrangler, args, { cwd: root, env: commandEnvironment(), stdio: ['ignore', 'pipe', 'pipe'] });
@@ -164,6 +165,7 @@ try {
     legacyDatabase.prepare('INSERT INTO site_settings (key, payload) VALUES (?, ?)').run('profile', JSON.stringify({ avatar: '/legacy.jpg', name: 'Legacy', bio: '', socials: [] }));
     legacyDatabase.exec(await readFile(join(root, 'migrations/0002_github_comments.sql'), 'utf8'));
     legacyDatabase.exec(await readFile(join(root, 'migrations/0003_site_setting_revisions.sql'), 'utf8'));
+    legacyDatabase.exec(await readFile(join(root, 'migrations/0004_link_applications.sql'), 'utf8'));
     const migrated = legacyDatabase.prepare('SELECT revision, draft_hash, published_hash, published_commit_sha, published_at FROM site_settings WHERE key = ?').get('profile');
     assert(migrated.revision === 1 && migrated.draft_hash === null && migrated.published_hash === null && migrated.published_commit_sha === null && migrated.published_at === null, 'Existing site_settings row did not migrate safely.');
   } finally { legacyDatabase.close(); }
@@ -171,7 +173,7 @@ try {
   await run(
     wrangler,
     ['d1', 'migrations', 'apply', 'helicase-blog-data', '--local', '--persist-to', temporary],
-    /0003_site_setting_revisions\.sql\s*│\s*✅/,
+    /0004_link_applications\.sql\s*│\s*✅/,
   );
   console.log('Smoke fixture: local D1 migrations applied.');
   const workerPort = await freePort();
@@ -188,6 +190,8 @@ try {
   assert(/^[a-f0-9]{40}$/i.test(buildMeta.commitSha || '') && ['profile', 'links', 'projects'].every(name => /^[a-f0-9]{64}$/i.test(buildMeta.contentHashes?.[name] || '')), 'Build metadata smoke failed.');
   const ocConfig = await api(base, '/api/oc-config', {}, false);
   assert(ocConfig.status === 200 && ocConfig.data.sitekey === 'smoke-site-key', 'OC Turnstile runtime config smoke failed.');
+  const linkConfig = await api(base, '/api/link-application-config', {}, false);
+  assert(linkConfig.status === 200 && linkConfig.data.sitekey === 'smoke-site-key', 'Link application Turnstile config smoke failed.');
   const favorites = await api(base, '/api/content/favorites', {}, false);
   assert(favorites.status === 200 && Array.isArray(favorites.data.items), 'Public D1 content API smoke failed.');
   const unauthorized = await api(base, '/api/admin/site/profile', {}, false);
@@ -230,6 +234,16 @@ try {
     body: JSON.stringify({ kind: 'zine', target: 'daily-2026-08-12-做过和学会之间', body: 'must pass target validation' }),
   }, false);
   assert(unicodeComment.status === 403, `Unicode article comment target was rejected before Turnstile (${unicodeComment.status}).`);
+
+  const invalidLinkApplication = await api(base, '/api/link-applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'HTTP site', url: 'http://example.com', description: 'insecure', contact: 'test@example.com' }) }, false);
+  assert(invalidLinkApplication.status === 400, `Insecure link application URL was accepted (${invalidLinkApplication.status}).`);
+  const linkApplication = await api(base, '/api/link-applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Smoke site', url: 'https://example.com', description: 'A smoke-test site', contact: 'test@example.com', avatarUrl: '', backlinkUrl: '', turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX' }) }, false);
+  assert(linkApplication.status === 202 && linkApplication.data.status === 'pending', `Valid link application was not stored (${linkApplication.status}: ${JSON.stringify(linkApplication.data)}).`);
+  const pendingLinks = await api(base, '/api/admin/link-applications');
+  assert(pendingLinks.status === 200 && pendingLinks.data.items?.length === 1 && pendingLinks.data.items[0].name === 'Smoke site', 'Stored link application was not visible to Studio.');
+  const approveLink = await api(base, '/api/admin/link-applications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: pendingLinks.data.items[0].id, status: 'approved' }) });
+  const reviewedLinks = await api(base, '/api/admin/link-applications');
+  assert(approveLink.status === 200 && reviewedLinks.data.items?.length === 0, 'Reviewed link application remained pending.');
 
   const legacyProjects = [{
     id: 'legacy-project', name: 'Legacy project', type: 'personal product', status: 'forming', progress: 58,
