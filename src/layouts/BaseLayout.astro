@@ -128,42 +128,4 @@ const socialImage = new URL(image, Astro.site ?? 'https://helicase.pages.dev');
   }
 </style>
 
-<script is:inline>
-  (function () {
-    // ClientRouter swaps page DOM. Keep the homepage clock independent from a
-    // component script so returning to `/` always rehydrates a live display.
-    function refreshHomeClock() {
-      document.querySelectorAll('#home-live-clock').forEach(function (node) {
-        node.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-      });
-    }
-    function startHomeClock() {
-      refreshHomeClock();
-      if (window.__helicaseHomeClock) clearInterval(window.__helicaseHomeClock);
-      window.__helicaseHomeClock = setInterval(refreshHomeClock, 1000);
-    }
-    document.addEventListener('astro:page-load', startHomeClock);
-    startHomeClock();
-
-    // Rolling project activity windows age in the browser. A quiet day does
-    // not need an empty Git commit merely to turn "7 days" into "6 days".
-    function refreshProjectActivity() {
-      document.querySelectorAll('[data-project-activity]').forEach(function (node) {
-        var series;
-        try { series = JSON.parse(node.getAttribute('data-project-activity') || '[]'); }
-        catch (_) { return; }
-        node.querySelectorAll('[data-project-days]').forEach(function (output) {
-          var days = Number(output.getAttribute('data-project-days'));
-          var cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-          var count = series.reduce(function (total, event) {
-            var occurredAt = Date.parse(event[0]);
-            return occurredAt >= cutoff && occurredAt <= Date.now() ? total + Math.max(1, Number(event[1]) || 1) : total;
-          }, 0);
-          output.textContent = String(count);
-        });
-      });
-    }
-    document.addEventListener('astro:page-load', refreshProjectActivity);
-    refreshProjectActivity();
-  })();
-</script>
+<script is:inline src="/site-security.js"></script>

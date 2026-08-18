@@ -2,7 +2,7 @@ const base = String(process.argv[2] || process.env.SITE_URL || 'https://helicase
 const errors = [];
 
 async function get(path, init) {
-  const response = await fetch(`${base}${path}`, { redirect: 'manual', signal: AbortSignal.timeout(15_000), ...init });
+  const response = await fetch(`${base}${path}`, { redirect: 'follow', signal: AbortSignal.timeout(15_000), ...init });
   return { response, text: await response.text() };
 }
 
@@ -21,7 +21,7 @@ if (metaResponse.response.status !== 200 || !/^[a-f0-9]{40}$/i.test(meta?.commit
 for (const name of ['profile', 'links', 'projects']) if (!/^[a-f0-9]{64}$/i.test(meta?.contentHashes?.[name] || '')) errors.push(`/build-meta.json is missing ${name} content hash.`);
 
 for (const path of ['/studio', '/editor', '/api/admin/site/profile']) {
-  const result = await get(path);
+  const result = await get(path, { redirect: 'manual' });
   if (result.response.status !== 401) errors.push(`${path} must require Basic Auth (got ${result.response.status}).`);
 }
 const publicApi = await get('/api/content/favorites');

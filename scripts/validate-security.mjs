@@ -11,10 +11,11 @@ const failures = [];
 if (/\.innerHTML\s*=/.test(studio)) failures.push('Studio must not assign API data through innerHTML.');
 if (!studio.includes("url.protocol==='https:'")) failures.push('Studio image URLs must be restricted to HTTPS.');
 for (const directive of [
-  "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
   "connect-src 'self' https://api.bgm.tv https://challenges.cloudflare.com",
   'frame-src https://challenges.cloudflare.com',
 ]) if (!headers.includes(directive)) failures.push(`Missing CSP directive: ${directive}`);
+if (/script-src[^;]*'unsafe-inline'/.test(headers)) failures.push('CSP script-src must not allow unsafe-inline.');
+if (!/script-src[^\n]*'sha256-[^']+'/.test(headers)) failures.push('CSP script-src must include hashes for approved inline scripts.');
 if (!worker.includes("return local && env.ALLOW_INSECURE_TURNSTILE_BYPASS === 'true'")) failures.push('Turnstile bypass must be explicit and restricted to localhost.');
 if (worker.includes('if (!env.TURNSTILE_SECRET_KEY) return true')) failures.push('Turnstile still fails open.');
 if (!worker.includes("resolved.origin !== origin")) failures.push('OAuth/logout redirects must enforce same-origin URLs.');

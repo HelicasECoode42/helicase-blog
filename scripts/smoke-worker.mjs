@@ -13,6 +13,7 @@ const username = 'smoke-user', password = 'smoke-password';
 const authorization = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
 const publicationCommit = 'a'.repeat(40);
 let githubContent = null;
+let csrfCookie = '';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -116,7 +117,14 @@ async function stopWorker(running) {
 
 async function api(base, path, init = {}, authenticated = true) {
   const headers = new Headers(init.headers || {});
-  if (authenticated) headers.set('Authorization', authorization);
+  headers.set('Origin', new URL(base).origin);
+  if (authenticated) {
+    headers.set('Authorization', authorization);
+    if (csrfCookie) {
+      headers.set('Cookie', csrfCookie);
+      headers.set('X-CSRF-Token', csrfCookie.slice('helicase_csrf='.length));
+    }
+  }
   const response = await fetch(`${base}${path}`, { ...init, headers });
   const text = await response.text();
   let data = null;
@@ -184,6 +192,21 @@ try {
   assert(favorites.status === 200 && Array.isArray(favorites.data.items), 'Public D1 content API smoke failed.');
   const unauthorized = await api(base, '/api/admin/site/profile', {}, false);
   assert(unauthorized.status === 401, `Expected unauthorized GET to return 401, got ${unauthorized.status}.`);
+  const studio = await fetch(`${base}/studio`, { headers: { Authorization: authorization, Origin: new URL(base).origin }, redirect: 'manual' });
+  const setCookie = studio.headers.get('set-cookie') || '';
+  const csrfMatch = setCookie.match(/(?:^|,\s*)helicase_csrf=([^;]+)/);
+  csrfCookie = csrfMatch ? `helicase_csrf=${csrfMatch[1]}` : '';
+  assert(studio.status >= 200 && studio.status < 400 && csrfCookie, `Authenticated Studio response must issue a CSRF cookie (status=${studio.status}, set-cookie=${setCookie}).`);
+  const csrfRejected = await fetch(`${base}/api/admin/site/profile`, {
+    method: 'POST', headers: { Authorization: authorization, Origin: new URL(base).origin, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: {}, expectedRevision: 0 }),
+  });
+  assert(csrfRejected.status === 403, `Admin writes without the CSRF token must be rejected (got ${csrfRejected.status}).`);
+  const crossOriginRejected = await fetch(`${base}/api/admin/site/profile`, {
+    method: 'POST', headers: { Authorization: authorization, Origin: 'https://evil.example', 'Content-Type': 'application/json', Cookie: csrfCookie, 'X-CSRF-Token': csrfCookie.slice('helicase_csrf='.length) },
+    body: JSON.stringify({ value: {}, expectedRevision: 0 }),
+  });
+  assert(crossOriginRejected.status === 403, `Cross-origin admin writes must be rejected (got ${crossOriginRejected.status}).`);
   const empty = await api(base, '/api/admin/site/profile');
   assert(empty.status === 200 && empty.data.revision === 0 && empty.data.value === null, 'Empty setting must start at revision 0.');
 
