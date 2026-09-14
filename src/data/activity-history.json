@@ -3,6 +3,45 @@
   "retentionDays": 400,
   "events": [
     {
+      "id": "github:14964859507",
+      "occurredAt": "2026-09-14T02:32:26.000Z",
+      "source": "github",
+      "project": "EchoForge",
+      "repository": "HelicasECoode42/EchoForge",
+      "visibility": "public",
+      "kind": "issue",
+      "action": "closed",
+      "count": 1,
+      "title": "建立 RAG golden set 与可重复回归 Harness",
+      "url": "https://github.com/HelicasECoode42/EchoForge/issues/6"
+    },
+    {
+      "id": "github:14964847735",
+      "occurredAt": "2026-09-14T02:32:01.000Z",
+      "source": "github",
+      "project": "EchoForge",
+      "repository": "HelicasECoode42/EchoForge",
+      "visibility": "public",
+      "kind": "issue",
+      "action": "closed",
+      "count": 1,
+      "title": "建立 RAG golden set 与可重复回归 Harness",
+      "url": "https://github.com/HelicasECoode42/EchoForge/issues/6"
+    },
+    {
+      "id": "github:14964831592",
+      "occurredAt": "2026-09-14T02:31:15.000Z",
+      "source": "github",
+      "project": "EchoForge",
+      "repository": "HelicasECoode42/EchoForge",
+      "visibility": "public",
+      "kind": "pull_request",
+      "action": "closed",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/EchoForge"
+    },
+    {
       "id": "github:13721062594",
       "occurredAt": "2026-08-23T17:11:51.000Z",
       "source": "github",
