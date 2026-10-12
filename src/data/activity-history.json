@@ -3,6 +3,45 @@
   "retentionDays": 400,
   "events": [
     {
+      "id": "github:23784996578",
+      "occurredAt": "2026-10-12T14:54:25.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "push",
+      "action": "created",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
+    },
+    {
+      "id": "github:17017308851",
+      "occurredAt": "2026-10-12T14:52:45.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "pull_request",
+      "action": "opened",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
+    },
+    {
+      "id": "github:17017216912",
+      "occurredAt": "2026-10-12T14:51:40.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "pull_request",
+      "action": "opened",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
+    },
+    {
       "id": "github:16728813886",
       "occurredAt": "2026-10-08T13:04:15.000Z",
       "source": "github",
