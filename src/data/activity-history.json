@@ -3,6 +3,19 @@
   "retentionDays": 400,
   "events": [
     {
+      "id": "github:17156584317",
+      "occurredAt": "2026-10-14T00:44:52.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "discussion",
+      "action": "commented",
+      "count": 1,
+      "title": "模块 C Planning Runner W1 骨架 + 对齐契约 #8/#10",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo/pull/11#issuecomment-6158311614"
+    },
+    {
       "id": "github:17101179419",
       "occurredAt": "2026-10-13T12:14:10.000Z",
       "source": "github",
@@ -120,8 +133,47 @@
       "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
     },
     {
+      "id": "github:23931808421",
+      "occurredAt": "2026-10-13T00:13:49.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "push",
+      "action": "created",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
+    },
+    {
+      "id": "github:23932786622",
+      "occurredAt": "2026-10-13T00:13:45.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "push",
+      "action": "created",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
+    },
+    {
       "id": "github:23784996578",
       "occurredAt": "2026-10-12T14:54:25.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "push",
+      "action": "created",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
+    },
+    {
+      "id": "github:23922554371",
+      "occurredAt": "2026-10-12T14:53:58.000Z",
       "source": "github",
       "project": "CoursePilot-Evo",
       "repository": "HelicasECoode42/CoursePilot-Evo",
