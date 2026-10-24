@@ -16,6 +16,32 @@
       "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
     },
     {
+      "id": "github:18073306443",
+      "occurredAt": "2026-10-23T03:48:14.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "discussion",
+      "action": "commented",
+      "count": 1,
+      "title": "会话内可以搜索班次，并只替换一门课后重验",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo/pull/28#issuecomment-6356905536"
+    },
+    {
+      "id": "github:24980752759",
+      "occurredAt": "2026-10-23T03:48:12.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "push",
+      "action": "created",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
+    },
+    {
       "id": "github:24787300470",
       "occurredAt": "2026-10-22T07:54:11.000Z",
       "source": "github",
