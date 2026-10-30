@@ -3,6 +3,19 @@
   "retentionDays": 400,
   "events": [
     {
+      "id": "github:18665146700",
+      "occurredAt": "2026-10-30T12:32:55.000Z",
+      "source": "github",
+      "project": "CoursePilot-Evo",
+      "repository": "HelicasECoode42/CoursePilot-Evo",
+      "visibility": "public",
+      "kind": "pull_request",
+      "action": "opened",
+      "count": 1,
+      "title": "",
+      "url": "https://github.com/HelicasECoode42/CoursePilot-Evo"
+    },
+    {
       "id": "github:25315375383",
       "occurredAt": "2026-10-26T10:29:15.000Z",
       "source": "github",
